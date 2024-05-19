@@ -1,0 +1,275 @@
+"""
+Implements several evaluation experiments to compare models.
+
+Classes:
+    DirectEvaluation: Evaluates model directly by comparing interpolated values to ground truth values.
+    IntervalLengthEvaluation: [Not in use] Evaluates model by comparing interpolated values to ground truth values for increasing lengths of missing intervals.
+
+Typical usage example:
+```python
+>>> from src.models.baseline import LinearInterpolation
+>>> from src.experiments.evaluations import DirectEvaluation, IntervalLengthEvaluation
+>>> model = LinearInterpolation()
+>>> direct_eval = DirectEvaluation(model)
+>>> dataset_directory = "data"
+>>> direct_eval.evaluate(dataset_directory, ablation_len=None, ablation_start=None, repetitions=1000, max_missing_interval=360, plot=True)
+```
+"""
+
+import numpy as np
+import torch
+import pandas as pd
+import pathlib
+import matplotlib.pyplot as plt
+import seaborn as sns
+import math
+import yaml
+import joblib
+from src.utils import searching_all_files
+from src.models.baseline import LinearInterpolation
+from src.models.statsforecast import StatsModels
+from src.models.LSTMs import LSTM, BidirectionalLSTM
+
+
+### Global Styling ###
+######################
+SMALL_SIZE = 10
+MEDIUM_SIZE = 14
+BIGGER_SIZE = 18
+CHONK_SIZE = 24
+plt.rcParams["font.family"] = "Times New Roman"
+plt.rc('axes', titlesize=BIGGER_SIZE, labelsize=MEDIUM_SIZE, facecolor="xkcd:black")
+plt.rc('xtick', labelsize=SMALL_SIZE)
+plt.rc('ytick', labelsize=SMALL_SIZE)
+plt.rc('legend', fontsize=SMALL_SIZE)
+plt.rc('figure', titlesize=CHONK_SIZE, facecolor="xkcd:white", edgecolor="xkcd:black")  
+sns.set_style("darkgrid", {'font.family':['serif'], 'axes.edgecolor':'black','ytick.left': True})
+plt.ticklabel_format(style = 'plain')
+######################
+
+
+class DirectEvaluation:
+    """Evaluates model directly by comparing interpolated values to ground truth values.
+
+    Attributes:
+        model: model to evaluate.
+        x_scaler: scaler used to normalize the x values of the training data.
+        y_scaler: scaler used to normalize the y values of the training data.
+    """
+    def __init__(self, model: object, version_path: pathlib.Path | list = None):
+        """Initializes an instance of the DirectEvaluation class.
+
+        Args:
+            model: model to evaluate.
+            version_path: which training run to use to instantiate the model. The path must be to the ".pt" checkpoint object.
+                The parent of the parent folder to this checkpoint must contain a 'scalers' folder with the MinMaxScalers used to 
+                normalize the training data. If using Bidirectional LSTM, provide a list of paths in the order [MLP, LSTM1, LSTM2]. 
+                A value None for this parameter is only appropriate if model is LinearInterpolation.
+        """
+        self.model = model
+        
+        if not version_path and type(model) not in  [LinearInterpolation, StatsModels]:
+            raise Exception("version_path cannot be None unless model is LinearInterpolation or StatsModels.")
+        
+        if version_path and type(model) == LSTM:
+            state_dict = torch.load(version_path)
+            model_dict = state_dict['model_state_dict']
+            prefix = 'lstm.'
+            modified_model_dict = {prefix+k: v for k, v in model_dict.items()}
+            self.model.load_state_dict(modified_model_dict)
+            self.x_scaler = joblib.load(version_path.parents[1] / "scalers" / "x_scaler.joblib")
+            self.y_scaler = joblib.load(version_path.parents[1] / "scalers" / "y_scaler.joblib")
+
+        if version_path and type(model) == BidirectionalLSTM:
+            mlp_state_dict = torch.load(version_path[0])
+            mlp_model_dict = mlp_state_dict['mlp_state_dict']
+            self.model.mlp.load_state_dict(mlp_model_dict)
+
+            lstm1_model_dict = torch.load(version_path[1])["model_state_dict"]
+            lstm2_model_dict = torch.load(version_path[2])["model_state_dict"]
+
+            prefix = 'lstm.'
+            modified_model_dict1 = {prefix+k: v for k, v in lstm1_model_dict.items()}
+            modified_model_dict2 = {prefix+k: v for k, v in lstm2_model_dict.items()}
+            self.model.lstm1.load_state_dict(modified_model_dict1)
+            self.model.lstm2.load_state_dict(modified_model_dict2)
+
+            self.x_scaler = joblib.load(version_path[0].parents[1] / "scalers" / "x_scaler.joblib")
+            self.y_scaler = joblib.load(version_path[0].parents[1] / "scalers" / "y_scaler.joblib")
+
+
+    def _prepare_data(self, x: np.ndarray, y: np.ndarray, ablation_len: int, ablation_start: int) -> dict:
+        """
+        Prepares data for evaluation.
+
+        Args:
+            x: evenly spaced values, no missing values.
+            y: values corresponding to x.
+            ablation_len: length of time for which data is removed. If None, then a random length is chosen less than half the length of the dataset.
+            ablation_start: index at which data is removed. If None, then a random index is chosen. if ablation_len + ablation_start > len(dataset) - 1, 
+                then the length of the ablation is reduced to fit the dataset. If ablation start is less than 1, it is set to 1.
+            
+        Returns:
+            dictionary of original x and y values, x and y values with missing interval removed, and the missing intervals.
+
+        Raises:
+            Exception: if ablation_len is greater than length of dataset.
+        """
+        if ablation_start is None:
+            ablation_start = np.random.randint(1, len(x) - ablation_len - 1)
+
+        if ablation_len > len(x) - 1:
+            raise Exception("Ablation length cannot be greater than length of dataset.")
+        if ablation_start < 1:
+            ablation_start = 1
+
+        if ablation_len + ablation_start >= len(x):
+            ablation_len = len(x) - ablation_start - 1
+
+        x_ablated = np.concatenate((x[:ablation_start], x[ablation_start + ablation_len:]))
+        y_ablated = np.concatenate((y[:ablation_start], y[ablation_start + ablation_len:]))
+
+        x_ablation = x[ablation_start:ablation_start + ablation_len]
+        y_ablation = y[ablation_start:ablation_start + ablation_len]
+
+        return {
+            "x": x,
+            "y": y,
+            "x_ablated": x_ablated,
+            "y_ablated": y_ablated,
+            "x_ablation": x_ablation,
+            "y_ablation": y_ablation,
+            "new_ablation_len": ablation_len,
+            "new_ablation_start": ablation_start
+        }
+
+
+    def evaluate(
+        self, 
+        directory: str, 
+        ablation_lens: list, 
+        ablation_start: int, 
+        repetitions: int, 
+        plot: bool = False, 
+        reverse: bool = False,
+        results_name: str = "direct_eval_results"
+    ):
+        """
+        Evaluates model over datasets in a directory. Datasets must have no missing values. 
+        The model will predict values of ablated intervals of data from these datasets. The resulting RMSEs are 
+        stored in a yaml file.
+
+        Args:
+            directory: path to folder containing csvs of all datasets to evaluate. For the datasets, the prediction values should be in the
+                last column
+            ablation_lens: list of length of time for which data is removed. If None, then a single random length is chosen.
+            ablation_start: index at which data is removed. If None, then a random index is chosen. if ablation_len + ablation_start > 
+                len(dataset) - 1, then the length of the ablation is reduced to fit the dataset.
+            repetitions: number of times to repeat the experiment for each dataset.
+            plot: whether to plot the results.
+            reverse: whether to reverse the order of the dataset for bidirectional LSTM models.
+            results_name: name of file to store results in. Do not add an extension.
+        """
+        file_paths = searching_all_files(directory)
+
+        for idx, file_path in enumerate(file_paths):
+            final_dict = {}
+
+            RMSE_list = []
+            outcome_ablation_lens = []
+            outcome_ablation_starts = []
+
+            dataset = pd.read_csv(file_path, index_col=0)
+            
+            if type(self.model) in [LinearInterpolation, StatsModels]:
+                x = dataset.index.values
+                y = dataset.values[:,-1]
+                y = y.reshape(-1,1)
+            else:
+                x = dataset.values
+                y = dataset.values[:,-1]
+                x = self.x_scaler.transform(x)
+                y = self.y_scaler.transform(y.reshape(-1,1))
+
+            ### Trimming dataset for testing 
+            ###    - make sure this is disjoint with the training set
+            x,y = x[32_000:], y[32_000:]
+            if reverse:
+                x,y = x[::-1], y[::-1]
+
+            if ablation_lens is None:
+                ablation_lens = [np.random.randint(math.floor(len(x)/2))]
+
+            criterion = lambda x,y: np.sqrt(np.mean(((x - y)/(np.average(y))) ** 2))
+
+            for ab_length in ablation_lens:
+                print(ab_length, flush=True)
+                for _ in range(repetitions):
+                    data = self._prepare_data(x, y, ab_length, ablation_start)
+                    self.model.fit(data["x_ablated"], data["y_ablated"])
+                    y_ablation_pred = self.model.predict(data["x_ablation"], data["new_ablation_start"]).reshape(-1,1)
+                    if type(self.model) in [LinearInterpolation, StatsModels]:
+                        RMSE_list.append(criterion(y_ablation_pred, data["y_ablation"]).item())
+                    else:
+                        y_ablation_pred = y_ablation_pred.detach().numpy()
+                        RMSE_list.append(
+                            criterion(
+                                self.y_scaler.inverse_transform(y_ablation_pred),
+                                self.y_scaler.inverse_transform(data["y_ablation"])
+                                ).item()
+                            )
+                        
+                    if plot:
+                        self._plot(data, data["new_ablation_start"], y_ablation_pred, file_path)
+                    
+                    outcome_ablation_lens.append(data["new_ablation_len"])
+                    outcome_ablation_starts.append(data["new_ablation_start"])
+
+                final_dict[str(file_path)] = {"RMSE": RMSE_list, "Ablation Length": outcome_ablation_lens, "Ablation Start": outcome_ablation_starts}
+        
+        yaml.dump(final_dict, open(f"output/{results_name}.yaml", "w"))
+    
+
+    def _plot(self, data: dict, ablation_start: int, y_ablation_pred: np.ndarray, file_path: pathlib.Path):
+        """
+        Plots the original data and the predicted data.
+
+        Args:
+            data: dictionary of original x and y values, x and y values with missing interval removed, and the missing intervals.
+            ablation_start: index at which data is removed.
+            y_ablation_pred: predicted y values for missing interval.
+            file_name: name of file for info about the plot
+
+        Notes:
+            Needs to be improved so that labeling of the plot is automated.
+        """
+        if type(self.model) == LinearInterpolation:
+            x_fin = data["x"]
+            y_fin = data["y"]
+            y_ablation_pred_fin = y_ablation_pred
+            y_ablated_fin = data["y_ablated"]
+        else:
+            x_fin = self.x_scaler.inverse_transform(data["x"])
+            y_fin = self.y_scaler.inverse_transform(data["y"])
+            y_ablation_pred_fin = self.y_scaler.inverse_transform(y_ablation_pred)
+            y_ablated_fin = self.y_scaler.inverse_transform(data["y_ablated"])
+
+        plt.plot(np.arange(x_fin.shape[0])[ablation_start-50: ablation_start + data["new_ablation_len"] + 50], y_fin[ablation_start-50: ablation_start + data["new_ablation_len"] + 50], label="Original", color="gray")
+        predicted_interval_x = np.arange(ablation_start-1, ablation_start + data["new_ablation_len"] + 1)
+        predicted_interval_y = np.concatenate((np.array([y_ablated_fin[ablation_start-1]]), y_ablation_pred_fin, np.array([y_ablated_fin[ablation_start]])))
+        plt.plot(predicted_interval_x, predicted_interval_y, label="LSTM", linestyle="dashed", color="blue")
+        
+        # plotting a straight line from the beginning of the ablated interval to the end
+        plt.plot([ablation_start-1, ablation_start + data["new_ablation_len"]], [y_ablated_fin[ablation_start-1], y_ablated_fin[ablation_start]], label="Baseline", linestyle="dotted", color="red")
+
+        plt.xlabel("Seconds after Midnight October 16th, 2023")
+        plt.ylabel("True Power Value")
+        plt.title("Example Prediction")
+        plt.legend()
+        
+        plt.show()
+
+        # folder = pathlib.Path("plots" / file_path.parents[0])
+        # folder.mkdir(parents=True, exist_ok=True)
+        # plt.savefig(folder / "example.png")
+        # plt.clf()
