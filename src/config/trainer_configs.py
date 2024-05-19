@@ -3,14 +3,14 @@ Configurations for training various models.
 
 Classes:
     TrainerConfig: base class for all trainer configurations.
-    MLPConfig: configuration for training an MLP model for use in the bidirectional LSTM model.
+    BidiMLPTrainerConfig: configuration of the MLP model and other settings for use in the bidirectional LSTM model.
 """
 import torch
 import datetime
 from copy import deepcopy
 
 
-class MLPTrainerConfig:
+class BidiMLPTrainerConfig:
     """
     Trainer class for MLP if included in bidirectional model.
 
@@ -20,8 +20,9 @@ class MLPTrainerConfig:
         optimizer: optimizer to use.
         lr_scheduler: whether or not to use a learning rate scheduler
         ablation_max: maximum size of the ablation to train for the bidirectional model. 
-        lstm1_cpt_file: path to the checkpoint file for the first LSTM model. if None, the model will be trained from scratch.
-        lstm2_cpt_file: path to the checkpoint file for the second LSTM model. if None, the model will be trained from scratch.
+        lstm_training: whether or not to train the LSTM models.
+        lstm_f_cpt_file: path to the checkpoint file for the first LSTM model. if None, the model will be trained from scratch.
+        lstm_b_cpt_file: path to the checkpoint file for the second LSTM model. if None, the model will be trained from scratch.
     """
     def __init__(
             self,
@@ -30,8 +31,9 @@ class MLPTrainerConfig:
             optimizer: torch.optim.Optimizer = torch.optim.Adam, 
             lr_scheduler: bool = False, 
             ablation_max: int = 50,
-            lstm1_cpt_file: str = None,
-            lstm2_cpt_file: str = None
+            lstm_training: bool = True,
+            lstm_f_cpt_file: str = None,
+            lstm_b_cpt_file: str = None
         ):
         """
         Initializes an instance of the TrainerConfig class.
@@ -42,16 +44,18 @@ class MLPTrainerConfig:
             optimizer: optimizer to use.
             lr_scheduler: whether or not to use a learingin rate scheduler
             ablation_max: maximum size of the ablation to train for the bidirectional model. 
-            lstm1_cpt_file: path to the checkpoint file for the first LSTM model. if None, the model will be trained from scratch.
-            lstm2_cpt_file: path to the checkpoint file for the second LSTM model. if None, the model will be trained from scratch.
+            lstm_training: whether or not to train the LSTM models.
+            lstm_f_cpt_file: path to the checkpoint file for the first LSTM model. if None, the model will be trained from scratch.
+            lstm_b_cpt_file: path to the checkpoint file for the second LSTM model. if None, the model will be trained from scratch.
         """
         self.n_epochs = n_epochs
         self.lr = lr
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
         self.ablation_max = ablation_max
-        self.lstm1_cpt_file = lstm1_cpt_file
-        self.lstm2_cpt_file = lstm2_cpt_file
+        self.lstm_training = lstm_training
+        self.lstm_f_cpt_file = lstm_f_cpt_file
+        self.lstm_b_cpt_file = lstm_b_cpt_file
 
     def copy(self):
         """
@@ -61,10 +65,10 @@ class MLPTrainerConfig:
     
     def __str__(self):
         return f"""
-        MLPTrainerConfig( n_epochs={self.n_epochs}, lr={self.lr}, optimizer={self.optimizer}, 
-                            lr_scheduler={self.lr_scheduler}, ablation_max={self.ablation_max},
-                            lstm1_cpt_file={self.lstm1_cpt_file}, 
-                            lstm2_cpt_file={self.lstm2_cpt_file})
+        BidiMLPTrainerConfig( n_epochs={self.n_epochs}, lr={self.lr}, optimizer={self.optimizer}, 
+                            lr_scheduler={self.lr_scheduler}, ablation_max={self.ablation_max}, lstm_training={self.lstm_training},
+                            lstm_f_cpt_file={self.lstm_f_cpt_file}, 
+                            lstm_b_cpt_file={self.lstm_b_cpt_file})
         """
 
 
@@ -79,7 +83,7 @@ class TrainerConfig:
         lr: learning rate.
         start_idx: the starting index of the dataset to consider. If None, the dataset will start from the beginning.
         stop_idx: the final index of the dataset to consider. If None, the dataset will end at the end.
-        optimizer: optimizer to use.
+        optimizer: which optimizer to use.
         logging_dir: directory to log training information.
         logging_steps_ratio: frequency (in epochs) of logging training information.
         save_steps_ratio: frequency (in epochs) of saving model checkpoints.
@@ -108,7 +112,7 @@ class TrainerConfig:
             checkpoint_path: str = None,
             run_name: str = None,
             reverse: bool = False,
-            mlp_trainer_config: MLPTrainerConfig = None
+            mlp_trainer_config: BidiMLPTrainerConfig = None
         ):
         """
         Initializes an instance of the TrainerConfig class.

@@ -1,11 +1,9 @@
 """
-A standalone script to evaluate a run an evaluation over a model. Modify the direct_eval_param_dict to change the parameters 
-of the evaluation. You can change the model and evaluation method by changing the model and eval variables at the bottom.
-Right now, the evaluation method is DirectEvaluation, but more will be added in the future.
+A standalone script to evaluate a model on a dataset.
 
 Typical usage example:
 ```bash
->>> python -m src.actions.evaluate
+>>> python -m src.actions.evaluate --dataset_directory data/processed/processed_data.csv --model lstm --lstm_n_layers 4 --lstm_input_size 9 --lstm_window_size 20 --version_path output/lstm_checkpoint.pth --ablation_lens 30 60 90 --results_name lstm_results
 ```
 """
 import pathlib
@@ -13,48 +11,50 @@ from src.models.LSTMs import LSTM, BidirectionalLSTM
 from src.models.baseline import LinearInterpolation
 from src.experiments.evaluations import DirectEvaluation
 from src.models.statsforecast import StatsModels
+import argparse
 
+parser = argparse.ArgumentParser("evaluation")
+parser.add_argument("--dataset_directory", type=str, required=True)
 
-#================================================
+parser.add_argument("--model", type=str, choices=["lstm", "bidi_lstm", "linear", "stats"], required=True)
+parser.add_argument("--stats_model_type", type=str, choices=["AA", "HW", "SN", "HA", "DOT"], default="AA", help="Model type for the statsmodels model.")
+parser.add_argument("--lstm_n_layers", type=int, default=4, help="Number of layers in the lstm or bilstm model.")
+parser.add_argument("--lstm_input_size", type=int, default=9, help="Number of features in the dataset if you choose an lstm or bilstm evaluation.")
+parser.add_argument("--lstm_window_size", type=int, default=20, help="Number of timesteps in the past to consider for the lstm or bilstm model.")
+parser.add_argument("--version_path", nargs="+", type=str, help="Path to the checkpoint file for the lstm or bilstm model. For the bilstm model, the paths should be in the following order: mlp, forward lstm, backward lstm.")
 
-# Direct Evaluation
+parser.add_argument("--ablation_lens", nargs="+", type=int, required=True)
+parser.add_argument("--ablation_start", type=int, default=None)
+parser.add_argument("--repetitions", type=int, default=1000)
+parser.add_argument("--plot", action=argparse.BooleanOptionalAction, default=False)
+parser.add_argument("--results_name", type=str, required=True)
 
-direct_eval_param_dict = {
-    # string
-    "directory" : "data/high_var_oct16/final",
-    # list or None (in seconds)
-    "ablation_lens" : [30, 90, 300],
-    # int or None
-    "ablation_start" : None,
-    # int
-    "repetitions" : 1000,
-    # bool
-    "plot" : False,
-    # string, no file extension
-    "results_name" : f"testing_baseline"
+args = parser.parse_args()
+
+eval_param_dict = {
+    "dataset_directory": args.dataset_directory,
+    "ablation_lens": args.ablation_lens,
+    "ablation_start": args.ablation_start,
+    "repetitions": args.repetitions,
+    "plot": args.plot,
+    "results_name": args.results_name
 }
 
-### LSTM Model ###
-# model = LSTM(input_size=9, n_layers=4, window_size=20)
-# version_path = pathlib.Path("logs/hyp_tune_1_logs/hyp_tune_1_l4_lr0.001_ws20_ep250/checkpoints/checkpt_e249.pt")
-# eval = DirectEvaluation(model, version_path=version_path)
-# eval.evaluate(**direct_eval_param_dict)
+if args.model == "lstm":
+    model = LSTM(input_size=args.lstm_input_size, n_layers=args.lstm_n_layers, window_size=args.lstm_window_size)
+    eval = DirectEvaluation(model, version_path=pathlib.Path(args.version_path[0]))
+    eval.evaluate(**eval_param_dict)
+elif args.model == "bidi_lstm":
+    model = BidirectionalLSTM(input_size=args.lstm_input_size, n_layers=args.lstm_n_layers, window_size=args.lstm_window_size)
+    eval = DirectEvaluation(model, version_path=[pathlib.Path(args.version_path[0]), pathlib.Path(args.version_path[1]), pathlib.Path(args.version_path[2])])
+    eval.evaluate(**eval_param_dict)
+elif args.model == "linear":
+    model = LinearInterpolation()
+    eval = DirectEvaluation(model)
+    eval.evaluate(**eval_param_dict)
+elif args.model == "stats":
+    model = StatsModels(model_type=args.stats_model_type)
+    eval = DirectEvaluation(model)
+    eval.evaluate(**eval_param_dict)
 
-### Linear Interpolation Model ###
-model = LinearInterpolation()
-eval = DirectEvaluation(model)
-eval.evaluate(**direct_eval_param_dict)
-
-### StatsModels Model ###
-# model = StatsModels(model_type="AA")
-# eval = DirectEvaluation(model)
-# eval.evaluate(**direct_eval_param_dict)
-
-### Bidirectional LSTM Model ###
-# model = BidirectionalLSTM(input_size=9, n_layers=4, window_size=20)
-# version_path = [pathlib.Path("logs/hyp_tune_bidi_1_logs/bidi_ht1_lr0.001_e50/checkpoints/checkpt_e49.pt"),
-#                 pathlib.Path("logs/hyp_tune_bidi_1_logs/bidi_ht1_lr0.001_e50/bidi_ht1_lr0.001_e50_lstm1/checkpoints/checkpt_e49.pt"),
-#                 pathlib.Path("logs/hyp_tune_bidi_1_logs/bidi_ht1_lr0.001_e50/bidi_ht1_lr0.001_e50_lstm2/checkpoints/checkpt_e49.pt")
-#                 ]
-# eval = DirectEvaluation(model, version_path=version_path)
-# eval.evaluate(**direct_eval_param_dict)
+print(f"Evaluation complete. Your results are in output/{args.results_name}.yaml", flush=True)

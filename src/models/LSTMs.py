@@ -335,11 +335,11 @@ class BidirectionalLSTM(torch.nn.Module):
 
     Attributes:
         input_size: number of features in the input.
-        lstm1_layers: number of layers in LSTM1.
-        lstm2_layers: number of layers in LSTM2.
+        lstm_f_layers: number of layers in lstm_f.
+        lstm_b_layers: number of layers in lstm_b.
         window_size: size of the sliding window for forward passes
-        lstm1: LSTM model for forecasting the data
-        lstm2: LSTM model for forecasting the data in reverse
+        lstm_f: LSTM model for forecasting the data
+        lstm_b: LSTM model for forecasting the data in reverse
         mlp: MLP model to combine the outputs of the LSTMs
         --------------------
         (Established in Methods)
@@ -350,7 +350,7 @@ class BidirectionalLSTM(torch.nn.Module):
         cfg: TrainerConfig object for training
         checkpoint_dict: dictionary of training information from checkpoint
     """
-    def __init__(self, input_size: int, lstm1_layers: int, lstm2_layers, window_size: int):
+    def __init__(self, input_size: int, lstm_f_layers: int, lstm_b_layers, window_size: int):
         """
         Initializes an instance of the LSTM class.
 
@@ -364,13 +364,13 @@ class BidirectionalLSTM(torch.nn.Module):
         self.y = None
 
         self.input_size = input_size
-        self.lstm1_layers = lstm1_layers
-        self.lstm2_layers = lstm2_layers
+        self.lstm_f_layers = lstm_f_layers
+        self.lstm_b_layers = lstm_b_layers
         self.window_size = window_size
-        self.lstm1 = LSTM(input_size=input_size, n_layers=lstm1_layers, window_size=window_size)
-        self.lstm2 = LSTM(input_size=input_size, n_layers=lstm2_layers, window_size=window_size)
+        self.lstm_f = LSTM(input_size=input_size, n_layers=lstm_f_layers, window_size=window_size)
+        self.lstm_b = LSTM(input_size=input_size, n_layers=lstm_b_layers, window_size=window_size)
         self.mlp = nn.Sequential(
-            nn.Linear(2,3), # input features: [lstm1 out, lstm2 out]
+            nn.Linear(2,3), # input features: [lstm_f out, lstm_b out]
             nn.ReLU(),
             nn.Linear(3,1)
         )
@@ -424,8 +424,8 @@ class BidirectionalLSTM(torch.nn.Module):
             y_pred_2 = torch.empty(len(x), 1)
 
             for i in range(len(x)):
-                _, hidden1, _ = self.lstm1.forward(x_interval_1)
-                _, hidden2, _ = self.lstm2.forward(x_interval_2)
+                _, hidden1, _ = self.lstm_f.forward(x_interval_1)
+                _, hidden2, _ = self.lstm_b.forward(x_interval_2)
 
                 y_pred_1[i] = hidden1[-1].item()
                 y_pred_2[i] = hidden2[-1].item()
@@ -464,41 +464,41 @@ class BidirectionalLSTM(torch.nn.Module):
 
         self.ablation_max = self.cfg.mlp_trainer_config.ablation_max
 
-        if not self.cfg.mlp_trainer_config.lstm1_cpt_file and not self.cfg.mlp_trainer_config.lstm2_cpt_file:
-            lstm1_cfg = cfg.copy()
-            lstm1_cfg.run_name = f"{cfg.run_name}_lstm1"
-            lstm1_cfg.logging_dir = f"{cfg.logging_dir}/{cfg.run_name}"
-            lstm1_cfg.reverse = False
+        if self.cfg.mlp_trainer_config.lstm_training:
+            lstm_f_cfg = cfg.copy()
+            lstm_f_cfg.run_name = f"{cfg.run_name}_lstm_f"
+            lstm_f_cfg.logging_dir = f"{cfg.logging_dir}/{cfg.run_name}"
+            lstm_f_cfg.reverse = False
 
-            lstm2_cfg = cfg.copy()
-            lstm2_cfg.run_name = f"{cfg.run_name}_lstm2"
-            lstm2_cfg.logging_dir = f"{cfg.logging_dir}/{cfg.run_name}"
-            lstm2_cfg.reverse = True
+            lstm_b_cfg = cfg.copy()
+            lstm_b_cfg.run_name = f"{cfg.run_name}_lstm_b"
+            lstm_b_cfg.logging_dir = f"{cfg.logging_dir}/{cfg.run_name}"
+            lstm_b_cfg.reverse = True
 
             with multiprocessing.Pool(2) as p:
-                p.starmap(self._lstm_training, [(1, lstm1_cfg), (2, lstm2_cfg)])
+                p.starmap(self._lstm_training, [(1, lstm_f_cfg), (2, lstm_b_cfg)])
 
             # read in models
-            lstm1_cpt_file = list(pathlib.Path(f"{lstm1_cfg.logging_dir}/{lstm1_cfg.run_name}/checkpoints/").glob("*.pt"))[-1]
-            lstm2_cpt_file = list(pathlib.Path(f"{lstm2_cfg.logging_dir}/{lstm2_cfg.run_name}/checkpoints/").glob("*.pt"))[-1]
+            lstm_f_cpt_file = list(pathlib.Path(f"{lstm_f_cfg.logging_dir}/{lstm_f_cfg.run_name}/checkpoints/").glob("*.pt"))[-1]
+            lstm_b_cpt_file = list(pathlib.Path(f"{lstm_b_cfg.logging_dir}/{lstm_b_cfg.run_name}/checkpoints/").glob("*.pt"))[-1]
         
         else:
-            lstm1_cpt_file = self.cfg.mlp_trainer_config.lstm1_cpt_file
-            lstm2_cpt_file = self.cfg.mlp_trainer_config.lstm2_cpt_file
+            lstm_f_cpt_file = self.cfg.mlp_trainer_config.lstm_f_cpt_file
+            lstm_b_cpt_file = self.cfg.mlp_trainer_config.lstm_b_cpt_file
 
-        lstm1_model_dict = torch.load(lstm1_cpt_file)["model_state_dict"]
-        lstm2_model_dict = torch.load(lstm2_cpt_file)["model_state_dict"]
+        lstm_f_model_dict = torch.load(lstm_f_cpt_file)["model_state_dict"]
+        lstm_b_model_dict = torch.load(lstm_b_cpt_file)["model_state_dict"]
 
         prefix = 'lstm.'
-        modified_model_dict1 = {prefix+k: v for k, v in lstm1_model_dict.items()}
-        modified_model_dict2 = {prefix+k: v for k, v in lstm2_model_dict.items()}
-        self.lstm1.load_state_dict(modified_model_dict1)
-        self.lstm2.load_state_dict(modified_model_dict2)
+        modified_model_dict1 = {prefix+k: v for k, v in lstm_f_model_dict.items()}
+        modified_model_dict2 = {prefix+k: v for k, v in lstm_b_model_dict.items()}
+        self.lstm_f.load_state_dict(modified_model_dict1)
+        self.lstm_b.load_state_dict(modified_model_dict2)
         
         # freezing the parameters
-        for param in self.lstm1.parameters():
+        for param in self.lstm_f.parameters():
             param.requires_grad = False
-        for param in self.lstm2.parameters():
+        for param in self.lstm_b.parameters():
             param.requires_grad = False
 
         # training the mlp
@@ -578,11 +578,11 @@ class BidirectionalLSTM(torch.nn.Module):
                 x_ablation = x_rel[self.window_size:self.window_size + self.ablation_max]
                 y_ablation = y_rel[self.window_size:self.window_size + self.ablation_max]
 
-                self.lstm1.fit(x_ablated, y_ablated)
-                y_ablation_pred_1 = self.lstm1.predict(x_ablation, self.window_size).reshape(-1,1)
+                self.lstm_f.fit(x_ablated, y_ablated)
+                y_ablation_pred_1 = self.lstm_f.predict(x_ablation, self.window_size).reshape(-1,1)
             
-                self.lstm2.fit(torch.flip(x_ablated, dims=[0]), torch.flip(y_ablated, dims=[0]))
-                y_ablation_pred_2 = self.lstm2.predict(torch.flip(x_ablation, dims=[0]), self.window_size).reshape(-1,1)
+                self.lstm_b.fit(torch.flip(x_ablated, dims=[0]), torch.flip(y_ablated, dims=[0]))
+                y_ablation_pred_2 = self.lstm_b.predict(torch.flip(x_ablation, dims=[0]), self.window_size).reshape(-1,1)
 
                 mlp_in = torch.stack((
                     y_ablation_pred_1, 
@@ -653,11 +653,11 @@ class BidirectionalLSTM(torch.nn.Module):
             y_ablation = y_rel[self.window_size:self.window_size + self.ablation_max]
 
             with torch.no_grad():
-                self.lstm1.fit(x_ablated, y_ablated)
-                y_ablation_pred_1 = self.lstm1.predict(x_ablation, self.window_size).reshape(-1,1)
+                self.lstm_f.fit(x_ablated, y_ablated)
+                y_ablation_pred_1 = self.lstm_f.predict(x_ablation, self.window_size).reshape(-1,1)
             
-                self.lstm2.fit(torch.flip(x_ablated, dims=[0]), torch.flip(y_ablated, dims=[0]))
-                y_ablation_pred_2 = self.lstm2.predict(torch.flip(x_ablation, dims=[0]), self.window_size).reshape(-1,1)
+                self.lstm_b.fit(torch.flip(x_ablated, dims=[0]), torch.flip(y_ablated, dims=[0]))
+                y_ablation_pred_2 = self.lstm_b.predict(torch.flip(x_ablation, dims=[0]), self.window_size).reshape(-1,1)
 
                 mlp_in = torch.stack((
                     y_ablation_pred_1, 
@@ -691,6 +691,6 @@ class BidirectionalLSTM(torch.nn.Module):
         Helper function to train the LSTMs in parallel.
         """
         if idx == 1:
-            self.lstm1.train(cfg)
+            self.lstm_f.train(cfg)
         elif idx == 2:
-            self.lstm2.train(cfg)
+            self.lstm_b.train(cfg)

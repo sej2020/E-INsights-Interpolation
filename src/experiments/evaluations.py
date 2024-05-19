@@ -3,7 +3,6 @@ Implements several evaluation experiments to compare models.
 
 Classes:
     DirectEvaluation: Evaluates model directly by comparing interpolated values to ground truth values.
-    IntervalLengthEvaluation: [Not in use] Evaluates model by comparing interpolated values to ground truth values for increasing lengths of missing intervals.
 
 Typical usage example:
 ```python
@@ -63,7 +62,7 @@ class DirectEvaluation:
             model: model to evaluate.
             version_path: which training run to use to instantiate the model. The path must be to the ".pt" checkpoint object.
                 The parent of the parent folder to this checkpoint must contain a 'scalers' folder with the MinMaxScalers used to 
-                normalize the training data. If using Bidirectional LSTM, provide a list of paths in the order [MLP, LSTM1, LSTM2]. 
+                normalize the training data. If using Bidirectional LSTM, provide a list of paths in the order [MLP, lstm_f, lstm_b]. 
                 A value None for this parameter is only appropriate if model is LinearInterpolation.
         """
         self.model = model
@@ -85,14 +84,14 @@ class DirectEvaluation:
             mlp_model_dict = mlp_state_dict['mlp_state_dict']
             self.model.mlp.load_state_dict(mlp_model_dict)
 
-            lstm1_model_dict = torch.load(version_path[1])["model_state_dict"]
-            lstm2_model_dict = torch.load(version_path[2])["model_state_dict"]
+            lstm_f_model_dict = torch.load(version_path[1])["model_state_dict"]
+            lstm_b_model_dict = torch.load(version_path[2])["model_state_dict"]
 
             prefix = 'lstm.'
-            modified_model_dict1 = {prefix+k: v for k, v in lstm1_model_dict.items()}
-            modified_model_dict2 = {prefix+k: v for k, v in lstm2_model_dict.items()}
-            self.model.lstm1.load_state_dict(modified_model_dict1)
-            self.model.lstm2.load_state_dict(modified_model_dict2)
+            modified_model_dict1 = {prefix+k: v for k, v in lstm_f_model_dict.items()}
+            modified_model_dict2 = {prefix+k: v for k, v in lstm_b_model_dict.items()}
+            self.model.lstm_f.load_state_dict(modified_model_dict1)
+            self.model.lstm_b.load_state_dict(modified_model_dict2)
 
             self.x_scaler = joblib.load(version_path[0].parents[1] / "scalers" / "x_scaler.joblib")
             self.y_scaler = joblib.load(version_path[0].parents[1] / "scalers" / "y_scaler.joblib")
