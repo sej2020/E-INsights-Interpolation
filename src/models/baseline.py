@@ -23,20 +23,23 @@ import warnings
 from typing import Tuple
 
 class LinearInterpolation:
-    """Performs linear interpolation on time-series data 
+    """
+    Performs linear interpolation on time-series data 
 
     Attributes:
         x: evenly spaced values, potentially with missing values.
         y: values corresponding to x.
     """
     def __init__(self):
-        """Initializes an instance of the LinearInterpolation class.
+        """
+        Initializes an instance of the LinearInterpolation class.
         """
         self.x = None
         self.y = None
 
     def fit(self, x: np.ndarray, y: np.ndarray):
-        """Fits model to data. Modifies object attributes and returns nothing.
+        """
+        Fits model to data. Modifies object attributes and returns nothing.
 
         Args:
             x: independent variables with an ablation
@@ -46,7 +49,8 @@ class LinearInterpolation:
         self.y = y
 
     def _point_predict(self, x: float) -> float:
-        """Predicts y value for x.
+        """
+        Predicts y value for x.
 
         Args:
             x: x value.
@@ -73,14 +77,15 @@ class LinearInterpolation:
             return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
         
     def predict(self, x: np.ndarray, ablation_start: int = None) -> np.ndarray:
-        """Predicts y values for x values.
+        """
+        Predicts y values for x values.
 
         Args:
             x: x values.
             ablation_start: index of where the first missing value would be placed in the array fitted to x. For example, if the array 
-                fitted to x is [3,4,6,7], the ablation start index should be 2, because the missing value would be in position 2 if the array was
-                uninterrupted. Note: if this parameter is None, function will have to predict missing values in linear time instead of 
-                constant time.
+                fitted to x is [3,4,6,7], the ablation start index should be 2, because the missing value would be in position 2 if the 
+                array was uninterrupted. Note: if this parameter is None, function will have to predict missing values in linear time 
+                instead of constant time.
 
         Returns:
             predicted y values.
@@ -109,7 +114,8 @@ class LinearInterpolation:
         
     
     def interpolate(self) -> Tuple[np.ndarray, np.ndarray]:
-        """Interpolates data.
+        """
+        Interpolates data.
 
         Returns:
             x values with missing interval interpolated, y values with missing interval interpolated.

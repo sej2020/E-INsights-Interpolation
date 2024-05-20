@@ -1,14 +1,17 @@
 """
-LSTMs bucko
+LSTM and BidirectionalLSTM classes for time series interpolation.
 
 Typical usage example:
 ```python
->>> lstm = LSTM(input_size = 2, n_layers = 4)
+>>> lstm = LSTM(input_size = 2, n_layers = 4, window_size = 10)
 >>> lstm_trainer_config = TrainerConfig(
 ...     dataset_path = "data/training_data.csv",
 ...     train_set_size = 0.8,
 ...     n_epochs = 1000,
+...     batch_size = 16,
 ...     lr = 0.001,
+...     start_idx = None,
+...     stop_idx = None,
 ...     optimizer = torch.optim.Adam,
 ...     logging_dir = "logs",
 ...     logging_steps_ratio = 0.1,
@@ -33,24 +36,25 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.preprocessing import StandardScaler
 import pandas as pd
 from joblib import dump
-import multiprocessing
+import warnings
 
-from src.config.trainer_configs import TrainerConfig
+from src.config.trainer_configs import TrainerConfig, BidiMLPTrainerConfig
 
 class LSTM(torch.nn.Module):
     """
     A unidirectional LSTM model.
 
     Attributes:
-        input_size: number of features in the input.
-        n_layers: number of layers in the LSTM.
+        input_size: number of features in the input
+        n_layers: number of layers in the LSTM
+        window_size: size of the sliding window for forward passes
         lstm: LSTM model
         --------------------
         (Established in Methods)
         x: independent variables for prediction
         y: dependent variable for prediction
-        self.ss_x: StandardScaler for independent variables
-        self.ss_y: StandardScaler for dependent variable
+        ss_x: StandardScaler for independent variables
+        ss_y: StandardScaler for dependent variable
         cfg: TrainerConfig object for training
         checkpoint_dict: dictionary of training information from checkpoint
     """
@@ -93,11 +97,12 @@ class LSTM(torch.nn.Module):
 
     def predict(self, x: torch.Tensor, ablation_start: int) -> torch.Tensor:
         """
-        Predicts the dependent variable based on the independent variables.
+        Predicts the dependent variable based on the independent variables. The instance's x and y attributes should be set to the
+        dataset with an ablation before calling this method. The value of x passed to this method should be that same ablation.
 
         Args:
             x: independent variable ablation for prediction
-            ablation_start: starting index of the ablation
+            ablation_start: starting index of the ablation in the dataset fit to self.x and self.y
         
         Returns:
             y_pred: predicted dependent variable for an ablation
@@ -168,7 +173,7 @@ class LSTM(torch.nn.Module):
         y = df.values[:,-1]
 
         ### Trimming dataset for training 
-            ###    - make sure this is disjoint with the test set
+        ###    - make sure this is disjoint with the evaluation dataset
         if self.cfg.start_idx and self.cfg.stop_idx:
             x,y = x[self.cfg.start_idx: self.cfg.stop_idx], y[self.cfg.start_idx: self.cfg.stop_idx]
         elif self.cfg.start_idx:
@@ -189,7 +194,6 @@ class LSTM(torch.nn.Module):
         # saving the fitted scalers
         scaler_path = pathlib.Path(f"{self.cfg.logging_dir}/{self.cfg.run_name}/scalers")
         scaler_path.mkdir(parents=True, exist_ok=True)
-
         dump(self.ss_x, scaler_path / "x_scaler.joblib")
         dump(self.ss_y, scaler_path / "y_scaler.joblib")
 
@@ -198,8 +202,8 @@ class LSTM(torch.nn.Module):
 
         x_train = torch.tensor(x_ss[:train_idx], dtype=torch.float32, requires_grad=True)
         y_train = torch.tensor(y_ss[:train_idx], dtype=torch.float32, requires_grad=True)
-        x_test = torch.tensor(x_ss[train_idx:], dtype=torch.float32, requires_grad=True)
-        y_test = torch.tensor(y_ss[train_idx:], dtype=torch.float32, requires_grad=True)
+        x_test = torch.tensor(x_ss[train_idx:], dtype=torch.float32)
+        y_test = torch.tensor(y_ss[train_idx:], dtype=torch.float32)
 
         criterion = torch.nn.MSELoss()
         optimizer = self.cfg.optimizer(self.lstm.parameters(), lr=self.cfg.lr)
@@ -232,9 +236,7 @@ class LSTM(torch.nn.Module):
         for epoch_n in pbar:
             # print(f"run: {str(self.cfg)}, epoch: {epoch_n}")
             epoch_loss = []
-
-            for i in range(0, len(x_train) - self.window_size - self.cfg.batch_size + 1, 1):
-
+            for i in range(len(x_train) - self.window_size - self.cfg.batch_size + 1):
                 x_train_window = x_train[i: i + self.window_size].unsqueeze(1)
                 y_train_window = y_train[i + self.window_size].unsqueeze(1)
                 for b in range(1, self.cfg.batch_size):
@@ -345,18 +347,19 @@ class BidirectionalLSTM(torch.nn.Module):
         (Established in Methods)
         x: independent variables for prediction
         y: dependent variable for prediction
-        self.ss_x: StandardScaler for independent variables
-        self.ss_y: StandardScaler for dependent variable
+        ss_x: StandardScaler for independent variables
+        ss_y: StandardScaler for dependent variable
         cfg: TrainerConfig object for training
         checkpoint_dict: dictionary of training information from checkpoint
     """
-    def __init__(self, input_size: int, lstm_f_layers: int, lstm_b_layers, window_size: int):
+    def __init__(self, input_size: int, lstm_f_layers: int, lstm_b_layers: int, window_size: int):
         """
         Initializes an instance of the LSTM class.
 
         Args:
-            input_size: number of features in the input.
-            n_layers: number of layers in the LSTMs.
+            input_size: number of features in the input
+            lstm_f_layers: number of layers in lstm_f
+            lstm_b_layers: number of layers in lstm_b
             window_size: size of the sliding window for forward passes of the LSTMs
         """
         super().__init__()
@@ -395,11 +398,12 @@ class BidirectionalLSTM(torch.nn.Module):
 
     def predict(self, x: torch.Tensor, ablation_start: int) -> torch.Tensor:
         """
-        Predicts the dependent variable based on the independent variables.
+        Predicts the dependent variable based on the independent variables. The instance's x and y attributes should be set to the
+        dataset with an ablation before calling this method. The value of x passed to this method should be that same ablation.
 
         Args:
             x: independent variable ablation for prediction
-            ablation_start: starting index of the ablation
+            ablation_start: starting index of the ablation in the dataset fit to self.x and self.y
         
         Returns:
             y_pred: predicted dependent variable for an ablation
@@ -409,41 +413,40 @@ class BidirectionalLSTM(torch.nn.Module):
 
         with torch.no_grad():
             if self.window_size > ablation_start:
-                x_interval_1 = self.x[:ablation_start]
+                x_interval_f = self.x[:ablation_start]
             else:
-                x_interval_1 = self.x[ablation_start-self.window_size:ablation_start]
+                x_interval_f = self.x[ablation_start-self.window_size:ablation_start]
 
             if self.window_size > len(self.x) - ablation_start:
-                x_interval_2 = torch.flip(self.x[ablation_start:], dims=[0])
+                x_interval_b = torch.flip(self.x[ablation_start:], dims=[0])
             else:
-                x_interval_2 = torch.flip(self.x[ablation_start:ablation_start+self.window_size], dims=[0])
+                x_interval_b = torch.flip(self.x[ablation_start:ablation_start+self.window_size], dims=[0])
 
-            x2 = torch.flip(x, dims=[0])
+            x_b = torch.flip(x, dims=[0])
 
-            y_pred_1 = torch.empty(len(x), 1)
-            y_pred_2 = torch.empty(len(x), 1)
+            y_pred_f = torch.empty(len(x), 1)
+            y_pred_b = torch.empty(len(x), 1)
 
             for i in range(len(x)):
-                _, hidden1, _ = self.lstm_f.forward(x_interval_1)
-                _, hidden2, _ = self.lstm_b.forward(x_interval_2)
+                _, hidden_f, _ = self.lstm_f.forward(x_interval_f)
+                _, hidden_b, _ = self.lstm_b.forward(x_interval_b)
 
-                y_pred_1[i] = hidden1[-1].item()
-                y_pred_2[i] = hidden2[-1].item()
+                y_pred_f[i] = hidden_f[-1].item()
+                y_pred_b[i] = hidden_b[-1].item()
 
-                x_interval_1 = torch.cat((x_interval_1[1:], x[i].reshape(1, -1)))
-                x_interval_2 = torch.cat((x_interval_2[1:], x2[i].reshape(1, -1)))
+                x_interval_f = torch.cat((x_interval_f[1:], x[i].reshape(1, -1)))
+                x_interval_b = torch.cat((x_interval_b[1:], x_b[i].reshape(1, -1)))
 
             mlp_in = torch.stack((
-                y_pred_1,
-                torch.flip(y_pred_2, dims=[0])
+                y_pred_f,
+                torch.flip(y_pred_b, dims=[0])
             ), dim=1).squeeze()
 
             y_pred = self.mlp(mlp_in)
             return y_pred
 
 
-
-    def train(self, cfg: TrainerConfig):
+    def train(self, cfg: BidiMLPTrainerConfig):
         """
         Trains the model. To view the training progress, run the following command in the terminal:
         ```bash
@@ -462,29 +465,10 @@ class BidirectionalLSTM(torch.nn.Module):
         with open(f"{hp_path}/trainer_config.txt", "w") as file:
             file.write(str(self.cfg))
 
-        self.ablation_max = self.cfg.mlp_trainer_config.ablation_max
+        self.ablation_max = self.cfg.ablation_max
 
-        if self.cfg.mlp_trainer_config.lstm_training:
-            lstm_f_cfg = cfg.copy()
-            lstm_f_cfg.run_name = f"{cfg.run_name}_lstm_f"
-            lstm_f_cfg.logging_dir = f"{cfg.logging_dir}/{cfg.run_name}"
-            lstm_f_cfg.reverse = False
-
-            lstm_b_cfg = cfg.copy()
-            lstm_b_cfg.run_name = f"{cfg.run_name}_lstm_b"
-            lstm_b_cfg.logging_dir = f"{cfg.logging_dir}/{cfg.run_name}"
-            lstm_b_cfg.reverse = True
-
-            with multiprocessing.Pool(2) as p:
-                p.starmap(self._lstm_training, [(1, lstm_f_cfg), (2, lstm_b_cfg)])
-
-            # read in models
-            lstm_f_cpt_file = list(pathlib.Path(f"{lstm_f_cfg.logging_dir}/{lstm_f_cfg.run_name}/checkpoints/").glob("*.pt"))[-1]
-            lstm_b_cpt_file = list(pathlib.Path(f"{lstm_b_cfg.logging_dir}/{lstm_b_cfg.run_name}/checkpoints/").glob("*.pt"))[-1]
-        
-        else:
-            lstm_f_cpt_file = self.cfg.mlp_trainer_config.lstm_f_cpt_file
-            lstm_b_cpt_file = self.cfg.mlp_trainer_config.lstm_b_cpt_file
+        lstm_f_cpt_file = self.cfg.lstm_f_cpt_file
+        lstm_b_cpt_file = self.cfg.lstm_b_cpt_file
 
         lstm_f_model_dict = torch.load(lstm_f_cpt_file)["model_state_dict"]
         lstm_b_model_dict = torch.load(lstm_b_cpt_file)["model_state_dict"]
@@ -494,6 +478,7 @@ class BidirectionalLSTM(torch.nn.Module):
         modified_model_dict2 = {prefix+k: v for k, v in lstm_b_model_dict.items()}
         self.lstm_f.load_state_dict(modified_model_dict1)
         self.lstm_b.load_state_dict(modified_model_dict2)
+        warnings.warn("LSTM models loaded from checkpoint. Make sure the LSTM models were trained on the same dataset that is being used to train this BiLSTM.")
         
         # freezing the parameters
         for param in self.lstm_f.parameters():
@@ -507,7 +492,7 @@ class BidirectionalLSTM(torch.nn.Module):
         y = df.values[:,-1]
 
         ### Trimming dataset for training
-            ###    - make sure this is disjoint with the test set
+        ###    - make sure this is disjoint with the test set
         if self.cfg.start_idx and self.cfg.stop_idx:
             x,y = x[self.cfg.start_idx: self.cfg.stop_idx], y[self.cfg.start_idx: self.cfg.stop_idx]
         elif self.cfg.start_idx:
@@ -533,33 +518,33 @@ class BidirectionalLSTM(torch.nn.Module):
 
         x_train = torch.tensor(x_ss[:train_idx], dtype=torch.float32, requires_grad=True)
         y_train = torch.tensor(y_ss[:train_idx], dtype=torch.float32, requires_grad=True)
-        x_test = torch.tensor(x_ss[train_idx:], dtype=torch.float32, requires_grad=True)
-        y_test = torch.tensor(y_ss[train_idx:], dtype=torch.float32, requires_grad=True)
+        x_test = torch.tensor(x_ss[train_idx:], dtype=torch.float32)
+        y_test = torch.tensor(y_ss[train_idx:], dtype=torch.float32)
 
         criterion = torch.nn.MSELoss()
-        optimizer = self.cfg.mlp_trainer_config.optimizer(self.mlp.parameters(), lr=self.cfg.mlp_trainer_config.lr)
+        optimizer = self.cfg.optimizer(self.mlp.parameters(), lr=self.cfg.lr)
 
-        pbar = tqdm.tqdm(range(self.cfg.mlp_trainer_config.n_epochs), disable=False)
+        pbar = tqdm.tqdm(range(self.cfg.n_epochs), disable=False)
         writer_path = pathlib.Path(f"{self.cfg.logging_dir}/{self.cfg.run_name}/tensorboard")
         writer_path.mkdir(parents=True, exist_ok=True)
         writer = SummaryWriter(log_dir=writer_path)
         logging_steps = int(1 / self.cfg.logging_steps_ratio)
         checkpointing_steps = int(1 / self.cfg.save_steps_ratio)
 
-        if self.cfg.mlp_trainer_config.lr_scheduler:
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, self.cfg.mlp_trainer_config.n_epochs)
+        if self.cfg.lr_scheduler:
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, self.cfg.n_epochs)
 
         if self.cfg.resume_from_checkpoint:
             self.checkpoint_dict = torch.load(self.cfg.checkpoint_path)
             model_dict = self.checkpoint_dict['mlp_state_dict']
-            prefix = 'lstm.'
+            prefix = 'mlp.'
             modified_model_dict = {prefix+k: v for k, v in model_dict.items()}
             self.mlp.load_state_dict(modified_model_dict)
             
             optimizer.load_state_dict(self.checkpoint_dict["optim_state_dict"])
             pbar = tqdm.tqdm(
-                iterable=range(self.checkpoint_dict["epoch"] + 1, self.cfg.mlp_trainer_config.n_epochs),
-                total=self.cfg.mlp_trainer_config.n_epochs,
+                iterable=range(self.checkpoint_dict["epoch"] + 1, self.cfg.n_epochs),
+                total=self.cfg.n_epochs,
                 initial=self.checkpoint_dict["epoch"] + 1,
             )
 
@@ -579,25 +564,25 @@ class BidirectionalLSTM(torch.nn.Module):
                 y_ablation = y_rel[self.window_size:self.window_size + self.ablation_max]
 
                 self.lstm_f.fit(x_ablated, y_ablated)
-                y_ablation_pred_1 = self.lstm_f.predict(x_ablation, self.window_size).reshape(-1,1)
+                y_ablation_pred_f = self.lstm_f.predict(x_ablation, self.window_size).reshape(-1,1)
             
                 self.lstm_b.fit(torch.flip(x_ablated, dims=[0]), torch.flip(y_ablated, dims=[0]))
-                y_ablation_pred_2 = self.lstm_b.predict(torch.flip(x_ablation, dims=[0]), self.window_size).reshape(-1,1)
+                y_ablation_pred_b = self.lstm_b.predict(torch.flip(x_ablation, dims=[0]), self.window_size).reshape(-1,1)
 
                 mlp_in = torch.stack((
-                    y_ablation_pred_1, 
-                    torch.flip(y_ablation_pred_2, dims=[0]), 
+                    y_ablation_pred_f, 
+                    torch.flip(y_ablation_pred_b, dims=[0]), 
                     ), dim=1).squeeze()
 
                 fin_preds = self.mlp(mlp_in)
                 
-                if i % 4 == 0:
+                if i % self.cfg.grad_accumulation_steps == 0:
                     loss = criterion(fin_preds, y_ablation)
                 else:
                     loss = loss + criterion(fin_preds, y_ablation)
 
-                if i % 4 == 3:
-                    loss = loss / 4
+                if i % self.cfg.grad_accumulation_steps == self.cfg.grad_accumulation_steps - 1:
+                    loss = loss / self.cfg.grad_accumulation_steps
                     epoch_loss.append(loss.item())
                     loss.backward()
                     optimizer.step()
@@ -619,7 +604,7 @@ class BidirectionalLSTM(torch.nn.Module):
                     "optim_state_dict": optimizer.state_dict(),
                 })
 
-            if self.cfg.mlp_trainer_config.lr_scheduler:
+            if self.cfg.lr_scheduler:
                 scheduler.step()
 
             pbar.set_description(f"Run: {self.cfg.run_name} - Loss: {round(sum(epoch_loss)/len(epoch_loss),3)}")
@@ -654,14 +639,14 @@ class BidirectionalLSTM(torch.nn.Module):
 
             with torch.no_grad():
                 self.lstm_f.fit(x_ablated, y_ablated)
-                y_ablation_pred_1 = self.lstm_f.predict(x_ablation, self.window_size).reshape(-1,1)
+                y_ablation_pred_f = self.lstm_f.predict(x_ablation, self.window_size).reshape(-1,1)
             
                 self.lstm_b.fit(torch.flip(x_ablated, dims=[0]), torch.flip(y_ablated, dims=[0]))
-                y_ablation_pred_2 = self.lstm_b.predict(torch.flip(x_ablation, dims=[0]), self.window_size).reshape(-1,1)
+                y_ablation_pred_b = self.lstm_b.predict(torch.flip(x_ablation, dims=[0]), self.window_size).reshape(-1,1)
 
                 mlp_in = torch.stack((
-                    y_ablation_pred_1, 
-                    torch.flip(y_ablation_pred_2, dims=[0]), 
+                    y_ablation_pred_f, 
+                    torch.flip(y_ablation_pred_b, dims=[0]), 
                     ), dim=1).squeeze()
 
                 fin_preds = self.mlp(mlp_in)
@@ -685,12 +670,3 @@ class BidirectionalLSTM(torch.nn.Module):
             checkpoint_dict,
             checkpoint_path / f"checkpt_e{checkpoint_dict['epoch']}.pt",
         )
-
-    def _lstm_training(self, idx, cfg):
-        """
-        Helper function to train the LSTMs in parallel.
-        """
-        if idx == 1:
-            self.lstm_f.train(cfg)
-        elif idx == 2:
-            self.lstm_b.train(cfg)

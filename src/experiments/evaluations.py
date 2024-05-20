@@ -2,12 +2,13 @@
 Implements several evaluation experiments to compare models.
 
 Classes:
-    DirectEvaluation: Evaluates model directly by comparing interpolated values to ground truth values.
+    DirectEvaluation: Evaluates model directly by comparing interpolated values to ground truth values for a given set of interval lenghts.
+        The process is repeated for a given number of repetitions. The results are stored in a yaml file.
 
 Typical usage example:
 ```python
 >>> from src.models.baseline import LinearInterpolation
->>> from src.experiments.evaluations import DirectEvaluation, IntervalLengthEvaluation
+>>> from src.experiments.evaluations import DirectEvaluation
 >>> model = LinearInterpolation()
 >>> direct_eval = DirectEvaluation(model)
 >>> dataset_directory = "data"
@@ -22,6 +23,7 @@ import pathlib
 import matplotlib.pyplot as plt
 import seaborn as sns
 import math
+import warnings
 import yaml
 import joblib
 from src.utils import searching_all_files
@@ -63,7 +65,7 @@ class DirectEvaluation:
             version_path: which training run to use to instantiate the model. The path must be to the ".pt" checkpoint object.
                 The parent of the parent folder to this checkpoint must contain a 'scalers' folder with the MinMaxScalers used to 
                 normalize the training data. If using Bidirectional LSTM, provide a list of paths in the order [MLP, lstm_f, lstm_b]. 
-                A value None for this parameter is only appropriate if model is LinearInterpolation.
+                A value None for this parameter is only appropriate if model is LinearInterpolation or StatsForecast.
         """
         self.model = model
         
@@ -104,9 +106,11 @@ class DirectEvaluation:
         Args:
             x: evenly spaced values, no missing values.
             y: values corresponding to x.
-            ablation_len: length of time for which data is removed. If None, then a random length is chosen less than half the length of the dataset.
-            ablation_start: index at which data is removed. If None, then a random index is chosen. if ablation_len + ablation_start > len(dataset) - 1, 
-                then the length of the ablation is reduced to fit the dataset. If ablation start is less than 1, it is set to 1.
+            ablation_len: length of time for which data is removed. If None, then a random length is chosen less than half the length 
+                of the dataset.
+            ablation_start: index at which data is removed. If None, then a random index is chosen. if ablation_len + ablation_start > 
+                len(dataset) - 1, then the length of the ablation is reduced to fit the dataset. If ablation start is less than 1, it is 
+                set to 1.
             
         Returns:
             dictionary of original x and y values, x and y values with missing interval removed, and the missing intervals.
@@ -123,6 +127,7 @@ class DirectEvaluation:
             ablation_start = 1
 
         if ablation_len + ablation_start >= len(x):
+            warnings.warn("Ablation length and start are too large for dataset. Reducing ablation length.")
             ablation_len = len(x) - ablation_start - 1
 
         x_ablated = np.concatenate((x[:ablation_start], x[ablation_start + ablation_len:]))
@@ -154,24 +159,23 @@ class DirectEvaluation:
         results_name: str = "direct_eval_results"
     ):
         """
-        Evaluates model over datasets in a directory. Datasets must have no missing values. 
-        The model will predict values of ablated intervals of data from these datasets. The resulting RMSEs are 
-        stored in a yaml file.
+        Evaluates model over datasets in a directory. Datasets must have no missing values. The model will predict values of ablated 
+        intervals of data from these datasets. The resulting RMSEs are stored in a yaml file.
 
         Args:
-            directory: path to folder containing csvs of all datasets to evaluate. For the datasets, the prediction values should be in the
-                last column
+            directory: path to folder containing csvs of all datasets to evaluate. For the datasets, the prediction values should be in 
+                the last column. Make sure datasets are disjoint with training data for LSTM, biLSTM models.
             ablation_lens: list of length of time for which data is removed. If None, then a single random length is chosen.
             ablation_start: index at which data is removed. If None, then a random index is chosen. if ablation_len + ablation_start > 
                 len(dataset) - 1, then the length of the ablation is reduced to fit the dataset.
             repetitions: number of times to repeat the experiment for each dataset.
-            plot: whether to plot the results.
+            plot: whether to produce plots of the ablations and predictions. Will block execution until plot is closed.
             reverse: whether to reverse the order of the dataset for bidirectional LSTM models.
             results_name: name of file to store results in. Do not add an extension.
         """
         file_paths = searching_all_files(directory)
 
-        for idx, file_path in enumerate(file_paths):
+        for _, file_path in enumerate(file_paths):
             final_dict = {}
 
             RMSE_list = []
@@ -190,9 +194,6 @@ class DirectEvaluation:
                 x = self.x_scaler.transform(x)
                 y = self.y_scaler.transform(y.reshape(-1,1))
 
-            ### Trimming dataset for testing 
-            ###    - make sure this is disjoint with the training set
-            x,y = x[32_000:], y[32_000:]
             if reverse:
                 x,y = x[::-1], y[::-1]
 
@@ -219,17 +220,20 @@ class DirectEvaluation:
                             )
                         
                     if plot:
-                        self._plot(data, data["new_ablation_start"], y_ablation_pred, file_path)
+                        self._plot(data, data["new_ablation_start"], y_ablation_pred)
                     
                     outcome_ablation_lens.append(data["new_ablation_len"])
                     outcome_ablation_starts.append(data["new_ablation_start"])
 
-                final_dict[str(file_path)] = {"RMSE": RMSE_list, "Ablation Length": outcome_ablation_lens, "Ablation Start": outcome_ablation_starts}
-        
+                final_dict[str(file_path)] = {
+                    "RMSE": RMSE_list, 
+                    "Ablation Length": outcome_ablation_lens, 
+                    "Ablation Start": outcome_ablation_starts
+                }
         yaml.dump(final_dict, open(f"output/{results_name}.yaml", "w"))
     
 
-    def _plot(self, data: dict, ablation_start: int, y_ablation_pred: np.ndarray, file_path: pathlib.Path):
+    def _plot(self, data: dict, ablation_start: int, y_ablation_pred: np.ndarray):
         """
         Plots the original data and the predicted data.
 
@@ -237,12 +241,11 @@ class DirectEvaluation:
             data: dictionary of original x and y values, x and y values with missing interval removed, and the missing intervals.
             ablation_start: index at which data is removed.
             y_ablation_pred: predicted y values for missing interval.
-            file_name: name of file for info about the plot
 
         Notes:
             Needs to be improved so that labeling of the plot is automated.
         """
-        if type(self.model) == LinearInterpolation:
+        if type(self.model) in [LinearInterpolation, StatsModels]:
             x_fin = data["x"]
             y_fin = data["y"]
             y_ablation_pred_fin = y_ablation_pred
@@ -253,22 +256,25 @@ class DirectEvaluation:
             y_ablation_pred_fin = self.y_scaler.inverse_transform(y_ablation_pred)
             y_ablated_fin = self.y_scaler.inverse_transform(data["y_ablated"])
 
-        plt.plot(np.arange(x_fin.shape[0])[ablation_start-50: ablation_start + data["new_ablation_len"] + 50], y_fin[ablation_start-50: ablation_start + data["new_ablation_len"] + 50], label="Original", color="gray")
+        plt.plot(
+            np.arange(x_fin.shape[0])[ablation_start-50: ablation_start + data["new_ablation_len"] + 50], 
+            y_fin[ablation_start-50: ablation_start + data["new_ablation_len"] + 50], 
+            label="Original", 
+            color="gray"
+        )
+        
         predicted_interval_x = np.arange(ablation_start-1, ablation_start + data["new_ablation_len"] + 1)
-        predicted_interval_y = np.concatenate((np.array([y_ablated_fin[ablation_start-1]]), y_ablation_pred_fin, np.array([y_ablated_fin[ablation_start]])))
+        predicted_interval_y = np.concatenate((
+            np.array([y_ablated_fin[ablation_start-1]]), 
+            y_ablation_pred_fin, 
+            np.array([y_ablated_fin[ablation_start]])
+        ))
+        
         plt.plot(predicted_interval_x, predicted_interval_y, label="LSTM", linestyle="dashed", color="blue")
         
         # plotting a straight line from the beginning of the ablated interval to the end
         plt.plot([ablation_start-1, ablation_start + data["new_ablation_len"]], [y_ablated_fin[ablation_start-1], y_ablated_fin[ablation_start]], label="Baseline", linestyle="dotted", color="red")
 
-        plt.xlabel("Seconds after Midnight October 16th, 2023")
-        plt.ylabel("True Power Value")
         plt.title("Example Prediction")
         plt.legend()
-        
         plt.show()
-
-        # folder = pathlib.Path("plots" / file_path.parents[0])
-        # folder.mkdir(parents=True, exist_ok=True)
-        # plt.savefig(folder / "example.png")
-        # plt.clf()

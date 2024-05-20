@@ -23,7 +23,7 @@ def searching_all_files(directory: str) -> list:
     return file_list
 
 
-def filter_data(path: pathlib.Path | str, max_missing_interval: int = 360, min_density: float = 0.75):
+def filter_data(path: pathlib.Path | str, max_missing_interval: int = 360, min_density: float = 0.75) -> bool:
     """
     Filters data by emitting a boolean value based on whether a.) the data has a missing interval longer
     than max_missing_interval, and b.) the data has a density greater than min_density
