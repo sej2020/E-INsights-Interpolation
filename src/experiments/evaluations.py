@@ -30,6 +30,7 @@ from src.utils import searching_all_files
 from src.models.baseline import LinearInterpolation
 from src.models.statsforecast import StatsModels
 from src.models.LSTMs import LSTM, BidirectionalLSTM
+from src.models.TimeGPT import TimeGPT
 
 
 ### Global Styling ###
@@ -69,8 +70,8 @@ class DirectEvaluation:
         """
         self.model = model
         
-        if not version_path and type(model) not in  [LinearInterpolation, StatsModels]:
-            raise Exception("version_path cannot be None unless model is LinearInterpolation or StatsModels.")
+        if not version_path and type(model) not in  [LinearInterpolation, StatsModels, TimeGPT]:
+            raise Exception("version_path cannot be None unless model is LinearInterpolation, StatsModels or TimeGPT.")
         
         if version_path and type(model) == LSTM:
             state_dict = torch.load(version_path)
@@ -150,20 +151,21 @@ class DirectEvaluation:
 
     def evaluate(
         self, 
-        directory: str, 
+        dataset_directory: str, 
         ablation_lens: list, 
         ablation_start: int, 
         repetitions: int, 
         plot: bool = False, 
         reverse: bool = False,
-        results_name: str = "direct_eval_results"
+        results_name: str = "direct_eval_results",
+        units: str = "s"
     ):
         """
         Evaluates model over datasets in a directory. Datasets must have no missing values. The model will predict values of ablated 
         intervals of data from these datasets. The resulting RMSEs are stored in a yaml file.
 
         Args:
-            directory: path to folder containing csvs of all datasets to evaluate. For the datasets, the prediction values should be in 
+            dataset_directory: path to folder containing csvs of all datasets to evaluate. For the datasets, the prediction values should be in 
                 the last column. Make sure datasets are disjoint with training data for LSTM, biLSTM models.
             ablation_lens: list of length of time for which data is removed. If None, then a single random length is chosen.
             ablation_start: index at which data is removed. If None, then a random index is chosen. if ablation_len + ablation_start > 
@@ -172,8 +174,11 @@ class DirectEvaluation:
             plot: whether to produce plots of the ablations and predictions. Will block execution until plot is closed.
             reverse: whether to reverse the order of the dataset for bidirectional LSTM models.
             results_name: name of file to store results in. Do not add an extension.
+            units: unit of time seperating each observation in the sequence. Options: s, min, h, d, w, mo, y.
         """
-        file_paths = searching_all_files(directory)
+        assert units in ["s", "min", "h", "D", "W", "MS", "YS"], "Invalid unit of time. Options: s, min, h, d, w, mo, y"
+
+        file_paths = searching_all_files(dataset_directory)
 
         for _, file_path in enumerate(file_paths):
             final_dict = {}
@@ -188,11 +193,19 @@ class DirectEvaluation:
                 x = dataset.index.values
                 y = dataset.values[:,-1]
                 y = y.reshape(-1,1)
+                y_av = np.mean(y)
+            elif type(self.model) in [TimeGPT]:
+                x = dataset.values
+                y = dataset.values[:,-1]
+                y = y.reshape(-1,1)
+                y_av = np.mean(y)
             else:
                 x = dataset.values
                 y = dataset.values[:,-1]
+                y = y.reshape(-1,1)
+                y_av = np.mean(y)
                 x = self.x_scaler.transform(x)
-                y = self.y_scaler.transform(y.reshape(-1,1))
+                y = self.y_scaler.transform(y)
 
             if reverse:
                 x,y = x[::-1], y[::-1]
@@ -200,15 +213,15 @@ class DirectEvaluation:
             if ablation_lens is None:
                 ablation_lens = [np.random.randint(math.floor(len(x)/2))]
 
-            criterion = lambda x,y: np.sqrt(np.mean(((x - y)/(np.average(y))) ** 2))
+            criterion = lambda x,y: np.sqrt(np.mean(((x - y)/y_av)) ** 2)
 
             for ab_length in ablation_lens:
                 print(ab_length, flush=True)
                 for _ in range(repetitions):
                     data = self._prepare_data(x, y, ab_length, ablation_start)
                     self.model.fit(data["x_ablated"], data["y_ablated"])
-                    y_ablation_pred = self.model.predict(data["x_ablation"], data["new_ablation_start"]).reshape(-1,1)
-                    if type(self.model) in [LinearInterpolation, StatsModels]:
+                    y_ablation_pred = self.model.predict(data["x_ablation"], data["new_ablation_start"], units=units).reshape(-1,1)
+                    if type(self.model) in [LinearInterpolation, StatsModels, TimeGPT]:
                         RMSE_list.append(criterion(y_ablation_pred, data["y_ablation"]).item())
                     else:
                         y_ablation_pred = y_ablation_pred.detach().numpy()

@@ -79,7 +79,7 @@ class StatsModels:
         self.y = y.squeeze()
 
         
-    def predict(self, x: np.ndarray, ablation_start: int) -> np.ndarray:
+    def predict(self, x: np.ndarray, ablation_start: int, units: str = 's') -> np.ndarray:
         """
         Predicts y values for x values.
 
@@ -88,6 +88,7 @@ class StatsModels:
             ablation_start: index of where the first missing value would be placed in the array fitted to x. For example, if the array 
                 fitted to x is [3,4,6,7], the ablation start index should be 2, because the missing value would be in position 2 if the array was
                 uninterrupted.
+            units: unit of time for the x values. Default is 's' for seconds (unused)
 
         Returns:
             predicted y values.

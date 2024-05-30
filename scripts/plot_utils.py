@@ -136,13 +136,14 @@ def bar_chart_comp(
     
 if __name__ == "__main__":    
 
+    prefix = "output/time_gpt_comp_v2"
     for data in ["CNC", "HVAC", "M00", "M02"]:
-        yamls = [f"output/eval_{data}_baseline.yaml", f"output/eval_{data}_backwardsLSTM.yaml", f"output\eval_{data}_LSTM.yaml"]
-        names = ["Baseline", "LSTM (rev)", "LSTM"]
-        colors = ["red", "seagreen", "blue"]
-        len_list = [15, 60, 360]
-        rep = 500
-        out_folder = f"eval/{data}"
+        yamls = [f"{prefix}/{data}/{data}_linear.yaml", f"{prefix}/{data}/{data}_lstm.yaml", f"{prefix}/{data}/{data}_lstm_rev.yaml", f"{prefix}/{data}/{data}_gpt.yaml"]
+        names = ["Baseline", "LSTM", "LSTM (rev)", "TimeGPT"]
+        colors = ["red", "blue", "green", "gold"]
+        len_list = [15, 30, 90]
+        rep = 100
+        out_folder = f"time_gpt_comp_v2/{data}"
 
         histogram_results(
             yaml_list=yamls, 
@@ -161,3 +162,29 @@ if __name__ == "__main__":
             repetitions=rep, 
             out_folder=out_folder
             )
+
+    data = "high_var"
+    yamls = [f"{prefix}/{data}/{data}_linear.yaml", f"{prefix}/{data}/{data}_lstm.yaml", f"{prefix}/{data}/{data}_gpt.yaml"]
+    names = ["Baseline", "LSTM", "TimeGPT"]
+    colors = ["red", "blue", "gold"]
+    len_list = [15, 30, 90]
+    rep = 100
+    out_folder = f"time_gpt_comp_v2/{data}"
+
+    histogram_results(
+        yaml_list=yamls, 
+        model_name_list=names, 
+        model_colors_list=colors, 
+        int_len_list=len_list, 
+        repetitions=rep, 
+        out_folder=out_folder
+        )
+    
+    bar_chart_comp(
+        yaml_list=yamls, 
+        model_name_list=names, 
+        model_colors_list=colors, 
+        int_len_list=len_list, 
+        repetitions=rep, 
+        out_folder=out_folder
+        )

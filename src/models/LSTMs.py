@@ -95,7 +95,7 @@ class LSTM(torch.nn.Module):
         self.y = y
 
 
-    def predict(self, x: torch.Tensor, ablation_start: int) -> torch.Tensor:
+    def predict(self, x: torch.Tensor, ablation_start: int, units: str = 's') -> torch.Tensor:
         """
         Predicts the dependent variable based on the independent variables. The instance's x and y attributes should be set to the
         dataset with an ablation before calling this method. The value of x passed to this method should be that same ablation.
@@ -103,6 +103,7 @@ class LSTM(torch.nn.Module):
         Args:
             x: independent variable ablation for prediction
             ablation_start: starting index of the ablation in the dataset fit to self.x and self.y
+            units: unit of time for the x values. Default is 's' for seconds (unused).
         
         Returns:
             y_pred: predicted dependent variable for an ablation
@@ -396,7 +397,7 @@ class BidirectionalLSTM(torch.nn.Module):
         self.y = y
 
 
-    def predict(self, x: torch.Tensor, ablation_start: int) -> torch.Tensor:
+    def predict(self, x: torch.Tensor, ablation_start: int, units: str = "s") -> torch.Tensor:
         """
         Predicts the dependent variable based on the independent variables. The instance's x and y attributes should be set to the
         dataset with an ablation before calling this method. The value of x passed to this method should be that same ablation.
@@ -404,6 +405,7 @@ class BidirectionalLSTM(torch.nn.Module):
         Args:
             x: independent variable ablation for prediction
             ablation_start: starting index of the ablation in the dataset fit to self.x and self.y
+            units: unit of time for the x values. Default is 's' for seconds (unused).
         
         Returns:
             y_pred: predicted dependent variable for an ablation

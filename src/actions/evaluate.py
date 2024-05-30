@@ -11,22 +11,25 @@ from src.models.LSTMs import LSTM, BidirectionalLSTM
 from src.models.baseline import LinearInterpolation
 from src.experiments.evaluations import DirectEvaluation
 from src.models.statsforecast import StatsModels
+from src.models.TimeGPT import TimeGPT
 import argparse
 
 parser = argparse.ArgumentParser("evaluation")
 parser.add_argument("--dataset_directory", type=str, required=True)
 
-parser.add_argument("--model", type=str, choices=["lstm", "bidi_lstm", "linear", "stats"], required=True)
+parser.add_argument("--model", type=str, choices=["lstm", "bidi_lstm", "linear", "stats", "timegpt"], required=True)
 parser.add_argument("--stats_model_type", type=str, choices=["AA", "HW", "SN", "HA", "DOT"], default="AA", help="Model type for the statsmodels model.")
 parser.add_argument("--lstm_n_layers", type=int, default=4, help="Number of layers in the lstm or bilstm model.")
 parser.add_argument("--lstm_input_size", type=int, default=9, help="Number of features in the dataset if you choose an lstm or bilstm evaluation.")
 parser.add_argument("--lstm_window_size", type=int, default=20, help="Number of timesteps in the past to consider for the lstm or bilstm model.")
 parser.add_argument("--version_path", nargs="+", type=str, help="Path to the checkpoint file for the lstm or bilstm model. For the bilstm model, the paths should be in the following order: mlp, forward lstm, backward lstm.")
+parser.add_argument("--reverse", action=argparse.BooleanOptionalAction, default=False)
 
 parser.add_argument("--ablation_lens", nargs="+", type=int, required=True)
 parser.add_argument("--ablation_start", type=int, default=None)
-parser.add_argument("--repetitions", type=int, default=1000)
+parser.add_argument("--repetitions", type=int, default=100)
 parser.add_argument("--plot", action=argparse.BooleanOptionalAction, default=False)
+parser.add_argument("--units", type=str, default="s")
 parser.add_argument("--results_name", type=str, required=True)
 
 args = parser.parse_args()
@@ -37,7 +40,9 @@ eval_param_dict = {
     "ablation_start": args.ablation_start,
     "repetitions": args.repetitions,
     "plot": args.plot,
-    "results_name": args.results_name
+    "reverse": args.reverse,
+    "results_name": args.results_name,
+    "units": args.units
 }
 
 if args.model == "lstm":
@@ -54,6 +59,10 @@ elif args.model == "linear":
     eval.evaluate(**eval_param_dict)
 elif args.model == "stats":
     model = StatsModels(model_type=args.stats_model_type)
+    eval = DirectEvaluation(model)
+    eval.evaluate(**eval_param_dict)
+elif args.model == "timegpt":
+    model = TimeGPT()
     eval = DirectEvaluation(model)
     eval.evaluate(**eval_param_dict)
 

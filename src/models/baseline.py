@@ -76,7 +76,7 @@ class LinearInterpolation:
             y1 = self.y[i]
             return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
         
-    def predict(self, x: np.ndarray, ablation_start: int = None) -> np.ndarray:
+    def predict(self, x: np.ndarray, ablation_start: int = None, units: str = "s") -> np.ndarray:
         """
         Predicts y values for x values.
 
@@ -86,6 +86,7 @@ class LinearInterpolation:
                 fitted to x is [3,4,6,7], the ablation start index should be 2, because the missing value would be in position 2 if the 
                 array was uninterrupted. Note: if this parameter is None, function will have to predict missing values in linear time 
                 instead of constant time.
+            units: unit of time for the x values. Default is 's' for seconds (unused).
 
         Returns:
             predicted y values.
