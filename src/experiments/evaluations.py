@@ -174,9 +174,9 @@ class DirectEvaluation:
             plot: whether to produce plots of the ablations and predictions. Will block execution until plot is closed.
             reverse: whether to reverse the order of the dataset for bidirectional LSTM models.
             results_name: name of file to store results in. Do not add an extension.
-            units: unit of time seperating each observation in the sequence. Options: s, min, h, d, w, mo, y.
+            units: unit of time seperating each observation in the sequence. Options: s, min, h, D, W, MS, YS.
         """
-        assert units in ["s", "min", "h", "D", "W", "MS", "YS"], "Invalid unit of time. Options: s, min, h, d, w, mo, y"
+        assert units in ["s", "min", "h", "D", "W", "MS", "YS"], "Invalid unit of time. Options: s, min, h, D, W, MS, YS"
 
         file_paths = searching_all_files(dataset_directory)
 
