@@ -3,19 +3,11 @@ TimesFM model for time-series forecasting.
 """
 import numpy as np
 import pandas as pd
-from nixtla import NixtlaClient
-from dotenv import load_dotenv
-import os
-load_dotenv('secret.env')
+import timesfm
 
-api_key = os.getenv("NIXTLA_API_KEY")
-
-nixtla_client = NixtlaClient(api_key=api_key)
-nixtla_client.validate_api_key()
-
-class TimeGPT:
+class TimesFM:
     """
-    Time-series forecasting model using TimeGPT from the Nixtla package.
+    Time-series forecasting model using TimesFM - https://github.com/google-research/timesfm
 
     Attributes:
         x: evenly spaced values, potentially with missing values.
@@ -23,8 +15,18 @@ class TimeGPT:
     """
     def __init__(self):
         """
-        Initializes an instance of the TimeGPT class.
+        Initializes an instance of the TimesFM class.
         """
+        self.tfm = timesfm.TimesFm(
+            context_len=128,
+            horizon_len=128,
+            input_patch_len=32,
+            output_patch_len=128,
+            num_layers=20,
+            model_dims=1280,
+            backend="cpu",
+        )
+        self.tfm.load_from_checkpoint(repo_id="google/timesfm-1.0-200m")
         self.x = None
         self.y = None
 
@@ -61,16 +63,12 @@ class TimeGPT:
         if self.y is None:
             raise Exception("Model not fitted.")
         
-        ds = pd.date_range(start='1/1/2010', periods=len(self.y[:ablation_start]) + len(x), freq=units)
-        df = pd.DataFrame({'ds': ds[:ablation_start], 'y': self.y.flatten()[:ablation_start]})
-        for col in range(self.x.shape[1]):
-            df[f'x{col}'] = self.x[:ablation_start, col]
+        pre_ablation_context = self.x[:ablation_start]
+        forecast_input = [pre_ablation_context[row, :] for row in range(len(pre_ablation_context))]
+        forecast_input.append(self.y[:ablation_start])
 
-        # exo_vars = pd.DataFrame({'ds': ds[ablation_start:]})
-        # for col in range(x.shape[1]):
-        #     exo_vars[f'x{col}'] = x[:, col]
-
-        fcst = nixtla_client.forecast(df=df, h=len(x), freq=units)
-        # fcst = nixtla_client.forecast(df=df, X_df=exo_vars, h=len(x), freq=units)
-
-        return fcst['TimeGPT'].values
+        point_forecast, _ = self.tfm.forecast(
+            forecast_input
+        )
+        
+        return point_forecast[:len(x)]
