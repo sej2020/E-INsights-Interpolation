@@ -195,7 +195,7 @@ class DirectEvaluation:
                 y = y.reshape(-1,1)
                 y_av = np.mean(y)
             elif type(self.model) in [TimeGPT]:
-                x = dataset.values
+                x = dataset.values[:,:-1]
                 y = dataset.values[:,-1]
                 y = y.reshape(-1,1)
                 y_av = np.mean(y)

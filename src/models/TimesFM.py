@@ -64,11 +64,17 @@ class TimesFM:
             raise Exception("Model not fitted.")
         
         pre_ablation_context = self.x[:ablation_start]
-        forecast_input = [pre_ablation_context[row, :] for row in range(len(pre_ablation_context))]
+        forecast_input = [pre_ablation_context[:,col] for col in range(self.x.shape[1])]
         forecast_input.append(self.y[:ablation_start])
 
         point_forecast, _ = self.tfm.forecast(
             forecast_input
         )
-        
         return point_forecast[:len(x)]
+    
+if __name__ == '__main__':
+    tfm = TimesFM()
+    x = np.ones((150300, 8))
+    y = np.ones((150300))
+    tfm.fit(x,y)
+    print(tfm.predict(np.zeros((3, 20)), 20), flush=True)
