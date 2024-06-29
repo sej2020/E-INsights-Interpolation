@@ -119,7 +119,7 @@ def bar_chart_comp(
         bar_dict[mod_name] = [model_dict[mod_name][int_len] for int_len in int_len_list]
     print(bar_dict)
     #grouped bar chart
-    barWidth = 0.2
+    barWidth = 0.15
     r1 = np.arange(len(int_len_list))
     for bars, color, mod_name in zip(bar_dict.values(), model_colors_list, model_name_list):
         plt.bar(r1, bars, color=color, width=barWidth, edgecolor='white', label=mod_name)
@@ -136,14 +136,14 @@ def bar_chart_comp(
     
 if __name__ == "__main__":    
 
-    prefix = "output/time_gpt_comp_v2"
+    prefix = "output/big_comp"
     for data in ["CNC", "HVAC", "M00", "M02"]:
-        yamls = [f"{prefix}/{data}/{data}_linear.yaml", f"{prefix}/{data}/{data}_lstm.yaml", f"{prefix}/{data}/{data}_lstm_rev.yaml", f"{prefix}/{data}/{data}_gpt.yaml"]
-        names = ["Baseline", "LSTM", "LSTM (rev)", "TimeGPT"]
-        colors = ["red", "blue", "green", "gold"]
+        yamls = [f"{prefix}/{data}/{data}_linear.yaml", f"{prefix}/{data}/{data}_lstm.yaml", f"{prefix}/{data}/{data}_lstm_rev.yaml", f"{prefix}/{data}/{data}_gpt.yaml", f"{prefix}/{data}/{data}_timesfm.yaml"]
+        names = ["Baseline", "LSTM", "LSTM (rev)", "TimeGPT", "TimesFM"]
+        colors = ["red", "blue", "green", "gold", "purple"]
         len_list = [15, 30, 90]
         rep = 100
-        out_folder = f"time_gpt_comp_v2/{data}"
+        out_folder = f"big_comp/{data}"
 
         histogram_results(
             yaml_list=yamls, 
@@ -164,12 +164,12 @@ if __name__ == "__main__":
             )
 
     data = "high_var"
-    yamls = [f"{prefix}/{data}/{data}_linear.yaml", f"{prefix}/{data}/{data}_lstm.yaml", f"{prefix}/{data}/{data}_gpt.yaml"]
-    names = ["Baseline", "LSTM", "TimeGPT"]
-    colors = ["red", "blue", "gold"]
+    yamls = [f"{prefix}/{data}/{data}_linear.yaml", f"{prefix}/{data}/{data}_lstm.yaml", f"{prefix}/{data}/{data}_gpt.yaml", f"{prefix}/{data}/{data}_timesfm.yaml"]
+    names = ["Baseline", "LSTM", "TimeGPT", "TimesFM"]
+    colors = ["red", "blue", "gold", "purple"]
     len_list = [15, 30, 90]
     rep = 100
-    out_folder = f"time_gpt_comp_v2/{data}"
+    out_folder = f"big_comp/{data}"
 
     histogram_results(
         yaml_list=yamls, 
