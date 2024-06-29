@@ -71,7 +71,7 @@ class DirectEvaluation:
         """
         self.model = model
         
-        if not version_path and type(model) not in  [LinearInterpolation, StatsModels, TimeGPT]:
+        if not version_path and type(model) not in  [LinearInterpolation, StatsModels, TimeGPT, TimesFM]:
             raise Exception("version_path cannot be None unless model is LinearInterpolation, StatsModels or TimeGPT.")
         
         if version_path and type(model) == LSTM:
@@ -217,7 +217,7 @@ class DirectEvaluation:
             criterion = lambda x,y: np.sqrt(np.mean(((x - y)/y_av)) ** 2)
 
             for ab_length in ablation_lens:
-                if self.model in [TimesFM]:
+                if isinstance(self.model, TimesFM):
                     self.model = TimesFM(ablation_len=ab_length)
                 print(ab_length, flush=True)
                 for _ in range(repetitions):

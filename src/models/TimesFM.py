@@ -67,7 +67,7 @@ class TimesFM:
         if self.y is None:
             raise Exception("Model not fitted.")
         
-        assert self.ablation_len == x.shape[0], "Ablation length does not match the length of the input."
+        assert self.ablation_len == x.shape[0], f"Ablation length does not match the length of the input: {self.ablation_len} != {x.shape[0]}"
         
         pre_ablation_context = self.x[:ablation_start]
         forecast_input = [pre_ablation_context[:,col] for col in range(self.x.shape[1])]

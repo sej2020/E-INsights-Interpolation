@@ -12,10 +12,10 @@ from dotenv import load_dotenv
 import os
 load_dotenv('secret.env')
 
-api_key = os.getenv("NIXTLA_API_KEY")
+# api_key = os.getenv("NIXTLA_API_KEY")
 
-nixtla_client = NixtlaClient(api_key=api_key)
-nixtla_client.validate_api_key()
+# nixtla_client = NixtlaClient(api_key=api_key)
+# nixtla_client.validate_api_key()
 
 class TimeGPT:
     """
