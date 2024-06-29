@@ -12,12 +12,13 @@ from src.models.baseline import LinearInterpolation
 from src.experiments.evaluations import DirectEvaluation
 from src.models.statsforecast import StatsModels
 from src.models.TimeGPT import TimeGPT
+from src.models.TimesFM import TimesFM
 import argparse
 
 parser = argparse.ArgumentParser("evaluation")
 parser.add_argument("--dataset_directory", type=str, required=True)
 
-parser.add_argument("--model", type=str, choices=["lstm", "bidi_lstm", "linear", "stats", "timegpt"], required=True)
+parser.add_argument("--model", type=str, choices=["lstm", "bidi_lstm", "linear", "stats", "timegpt", "timesfm"], required=True)
 parser.add_argument("--stats_model_type", type=str, choices=["AA", "HW", "SN", "HA", "DOT"], default="AA", help="Model type for the statsmodels model.")
 parser.add_argument("--lstm_n_layers", type=int, default=4, help="Number of layers in the lstm or bilstm model.")
 parser.add_argument("--lstm_input_size", type=int, default=9, help="Number of features in the dataset if you choose an lstm or bilstm evaluation.")
@@ -63,6 +64,10 @@ elif args.model == "stats":
     eval.evaluate(**eval_param_dict)
 elif args.model == "timegpt":
     model = TimeGPT()
+    eval = DirectEvaluation(model)
+    eval.evaluate(**eval_param_dict)
+elif args.model == "timesfm":
+    model = TimesFM()
     eval = DirectEvaluation(model)
     eval.evaluate(**eval_param_dict)
 

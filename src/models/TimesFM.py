@@ -13,13 +13,17 @@ class TimesFM:
         x: evenly spaced values, potentially with missing values.
         y: values corresponding to x.
     """
-    def __init__(self):
+    def __init__(self, ablation_len: int = 128):
         """
         Initializes an instance of the TimesFM class.
+
+        Args:
+            ablation_len: length of the ablation
         """
+        self.ablation_len = ablation_len
         self.tfm = timesfm.TimesFm(
             context_len=128,
-            horizon_len=128,
+            horizon_len=ablation_len,
             input_patch_len=32,
             output_patch_len=128,
             num_layers=20,
@@ -63,6 +67,8 @@ class TimesFM:
         if self.y is None:
             raise Exception("Model not fitted.")
         
+        assert self.ablation_len == x.shape[0], "Ablation length does not match the length of the input."
+        
         pre_ablation_context = self.x[:ablation_start]
         forecast_input = [pre_ablation_context[:,col] for col in range(self.x.shape[1])]
         forecast_input.append(self.y[:ablation_start, 0])
@@ -70,7 +76,7 @@ class TimesFM:
         point_forecast, _ = self.tfm.forecast(
             forecast_input
         )
-        return point_forecast[-1, :len(x)]
+        return point_forecast[-1, :]
     
 if __name__ == '__main__':
     tfm = TimesFM()
