@@ -65,7 +65,7 @@ class TimesFM:
         
         pre_ablation_context = self.x[:ablation_start]
         forecast_input = [pre_ablation_context[:,col] for col in range(self.x.shape[1])]
-        forecast_input.append(self.y[:ablation_start])
+        forecast_input.append(self.y[:ablation_start, 0])
 
         point_forecast, _ = self.tfm.forecast(
             forecast_input
