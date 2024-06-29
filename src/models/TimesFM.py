@@ -70,11 +70,11 @@ class TimesFM:
         point_forecast, _ = self.tfm.forecast(
             forecast_input
         )
-        return point_forecast[:len(x)]
+        return point_forecast[-1, :len(x)]
     
 if __name__ == '__main__':
     tfm = TimesFM()
     x = np.ones((150300, 8))
-    y = np.ones((150300))
+    y = np.ones((150300, 1))
     tfm.fit(x,y)
-    print(tfm.predict(np.zeros((3, 20)), 20), flush=True)
+    print(tfm.predict(np.zeros((20, 8)), 20).shape, flush=True)
