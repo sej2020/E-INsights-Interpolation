@@ -2,7 +2,6 @@
 TimesFM model for time-series forecasting.
 """
 import numpy as np
-import pandas as pd
 import timesfm
 
 class TimesFM:
@@ -12,6 +11,8 @@ class TimesFM:
     Attributes:
         x: evenly spaced values, potentially with missing values.
         y: values corresponding to x.
+        ablation_len: length of the ablation
+        tfm: TimesFM model
     """
     def __init__(self, ablation_len: int = 128):
         """

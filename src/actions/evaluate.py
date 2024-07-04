@@ -13,12 +13,13 @@ from src.experiments.evaluations import DirectEvaluation
 from src.models.statsforecast import StatsModels
 from src.models.TimeGPT import TimeGPT
 from src.models.TimesFM import TimesFM
+from src.models.TempoGPT import TempoGPT
 import argparse
 
 parser = argparse.ArgumentParser("evaluation")
 parser.add_argument("--dataset_directory", type=str, required=True)
 
-parser.add_argument("--model", type=str, choices=["lstm", "bidi_lstm", "linear", "stats", "timegpt", "timesfm"], required=True)
+parser.add_argument("--model", type=str, choices=["lstm", "bidi_lstm", "linear", "stats", "timegpt", "timesfm", "tempo"], required=True)
 parser.add_argument("--stats_model_type", type=str, choices=["AA", "HW", "SN", "HA", "DOT"], default="AA", help="Model type for the statsmodels model.")
 parser.add_argument("--lstm_n_layers", type=int, default=4, help="Number of layers in the lstm or bilstm model.")
 parser.add_argument("--lstm_input_size", type=int, default=9, help="Number of features in the dataset if you choose an lstm or bilstm evaluation.")
@@ -49,26 +50,25 @@ eval_param_dict = {
 if args.model == "lstm":
     model = LSTM(input_size=args.lstm_input_size, n_layers=args.lstm_n_layers, window_size=args.lstm_window_size)
     eval = DirectEvaluation(model, version_path=pathlib.Path(args.version_path[0]))
-    eval.evaluate(**eval_param_dict)
 elif args.model == "bidi_lstm":
     model = BidirectionalLSTM(input_size=args.lstm_input_size, n_layers=args.lstm_n_layers, window_size=args.lstm_window_size)
     eval = DirectEvaluation(model, version_path=[pathlib.Path(args.version_path[0]), pathlib.Path(args.version_path[1]), pathlib.Path(args.version_path[2])])
-    eval.evaluate(**eval_param_dict)
 elif args.model == "linear":
     model = LinearInterpolation()
     eval = DirectEvaluation(model)
-    eval.evaluate(**eval_param_dict)
 elif args.model == "stats":
     model = StatsModels(model_type=args.stats_model_type)
     eval = DirectEvaluation(model)
-    eval.evaluate(**eval_param_dict)
 elif args.model == "timegpt":
     model = TimeGPT()
     eval = DirectEvaluation(model)
-    eval.evaluate(**eval_param_dict)
 elif args.model == "timesfm":
     model = TimesFM()
     eval = DirectEvaluation(model)
-    eval.evaluate(**eval_param_dict)
+elif args.model == "tempo":
+    model = TempoGPT()
+    eval = DirectEvaluation(model)
+
+eval.evaluate(**eval_param_dict)
 
 print(f"Evaluation complete. Your results are in output/{args.results_name}.yaml", flush=True)

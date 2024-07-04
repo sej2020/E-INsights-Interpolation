@@ -32,6 +32,8 @@ from src.models.statsforecast import StatsModels
 from src.models.LSTMs import LSTM, BidirectionalLSTM
 from src.models.TimeGPT import TimeGPT
 from src.models.TimesFM import TimesFM
+from src.models.TempoGPT import TempoGPT
+from statsmodels.tsa.seasonal import STL
 
 
 ### Global Styling ###
@@ -71,7 +73,7 @@ class DirectEvaluation:
         """
         self.model = model
         
-        if not version_path and type(model) not in  [LinearInterpolation, StatsModels, TimeGPT, TimesFM]:
+        if not version_path and type(model) not in  [LinearInterpolation, StatsModels, TimeGPT, TimesFM, TempoGPT]:
             raise Exception("version_path cannot be None unless model is LinearInterpolation, StatsModels or TimeGPT.")
         
         if version_path and type(model) == LSTM:
@@ -195,7 +197,7 @@ class DirectEvaluation:
                 y = dataset.values[:,-1]
                 y = y.reshape(-1,1)
                 y_av = np.mean(y)
-            elif type(self.model) in [TimeGPT, TimesFM]:
+            elif type(self.model) in [TimeGPT, TimesFM, TempoGPT]:
                 x = dataset.values[:,:-1]
                 y = dataset.values[:,-1]
                 y = y.reshape(-1,1)
@@ -207,6 +209,10 @@ class DirectEvaluation:
                 y_av = np.mean(y)
                 x = self.x_scaler.transform(x)
                 y = self.y_scaler.transform(y)
+
+            if isinstance(self.model, TempoGPT):
+                trend_stamp, seasonal_stamp, resid_stamp = self._stl_resolve(y, units=units)
+                self.model.set_str(trend_stamp, seasonal_stamp, resid_stamp)
 
             if reverse:
                 x,y = x[::-1], y[::-1]
@@ -294,3 +300,22 @@ class DirectEvaluation:
         plt.title("Example Prediction")
         plt.legend()
         plt.show()
+
+
+    def _stl_resolve(self, y: np.ndarray, units: str = "s"):
+        """
+        STL Global Decomposition
+        """
+        if units == "s":
+            period = 60
+        elif units == "min":
+            period = 60*24
+        elif units == "h":
+            period = 24
+        else:
+            raise NotImplementedError("Only seconds, minutes and hours are supported right now. Fix if getting this error.")
+        res = STL(y[:,0], period=period).fit()
+        trend_stamp = res.trend.reshape(-1,1)
+        seasonal_stamp = res.seasonal.reshape(-1,1)
+        resid_stamp = res.resid.reshape(-1,1)
+        return trend_stamp, seasonal_stamp, resid_stamp
