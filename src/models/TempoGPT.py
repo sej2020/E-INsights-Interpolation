@@ -28,7 +28,7 @@ class TempoGPT:
            device="cpu" 
         )
         best_model_path = "TEMPO_checkpoints/ettm2_TEMPO_3_prompt_learn_336_96_100_sl336_ll168_pl96_dm768_nh4_el3_gl3_df768_ebtimeF_itr0/checkpoint.pth"
-        self.model.load_state_dict(torch.load(best_model_path), strict=False)
+        self.model.load_state_dict(torch.load(best_model_path, map_location=torch.device('cpu')), strict=False)
         self.x = None
         self.y = None
 
@@ -103,16 +103,16 @@ class TempoGPT:
         residual = np.expand_dims(residual, axis=0)
         
         outputs, _ = self.model(
-            x=pre_ablation_context, 
+            x=torch.tensor(pre_ablation_context, dtype=torch.float32).repeat(2,1,1), 
             itr=0, 
-            trend=trend, 
-            season=seasonal, 
-            noise=residual, 
+            trend=torch.tensor(trend, dtype=torch.float32).repeat(2,1,1), 
+            season=torch.tensor(seasonal, dtype=torch.float32).repeat(2,1,1), 
+            noise=torch.tensor(residual, dtype=torch.float32).repeat(2,1,1), 
             test=True
             )
         outputs = outputs[:, -self.config.pred_len:, :]
         outputs = outputs[0, :x.shape[0], :]
-        return outputs
+        return outputs.detach().numpy()
         
 
 class TempoConfig:

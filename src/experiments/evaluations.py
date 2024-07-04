@@ -230,7 +230,7 @@ class DirectEvaluation:
                     data = self._prepare_data(x, y, ab_length, ablation_start)
                     self.model.fit(data["x_ablated"], data["y_ablated"])
                     y_ablation_pred = self.model.predict(data["x_ablation"], data["new_ablation_start"], units=units).reshape(-1,1)
-                    if type(self.model) in [LinearInterpolation, StatsModels, TimeGPT, TimesFM]:
+                    if type(self.model) in [LinearInterpolation, StatsModels, TimeGPT, TimesFM, TempoGPT]:
                         RMSE_list.append(criterion(y_ablation_pred, data["y_ablation"]).item())
                     else:
                         y_ablation_pred = y_ablation_pred.detach().numpy()
