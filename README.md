@@ -18,3 +18,7 @@ To be able to use TimesFM:
 2. complete the TimesFM environment setup
 3. install pytorch, seaborn, and dotenv into the TimesFM environment
 4. run scripts in the E-INsights-Interpolation from the TimesFM environment
+
+To be able to use TEMPO:
+1. activate the TimesFM environment (tfm_env) and run `pip install peft`
+2. download TEMPO model checkpoints from [Google Drive](https://drive.google.com/file/d/11Ho_seP9NGh-lQCyBkvQhAQFy_3XVwKp/view) and make sure the top level of this folder is named 'TEMPO_checkpoints/'
