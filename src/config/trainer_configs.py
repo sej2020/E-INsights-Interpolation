@@ -14,7 +14,7 @@ class TrainerConfig:
     Base class for all trainer configurations.
 
     Attributes:
-        dataset_path: path to the dataset. Should have no missing values.
+        dataset_path_lst: list of datasets to be used in training. Should have no missing values.
         train_set_size: proportion of dataset to use for training.
         n_epochs: number of epochs to train for.
         batch_size: size of the training batch.
@@ -23,38 +23,40 @@ class TrainerConfig:
         stop_idx: the final index of the dataset to consider. If None, the dataset will end at the end.
         optimizer: which optimizer to use.
         logging_dir: directory to log training information.
-        logging_steps_ratio: frequency (in epochs) of logging training information.
-        save_steps_ratio: frequency (in epochs) of saving model checkpoints.
+        logging_frequency: frequency of logging training information.
+        saving_frequency: frequency of saving model checkpoints.
         lr_scheduler: whether or not to use a learning rate scheduler
         resume_from_checkpoint: whether or not to resume training from a checkpoint.
         checkpoint_path: path to checkpoint to resume from.
         run_name: name of the run.
         reverse: whether or not to reverse the dataset for use in bidirectional models.
+        batch_stride: by how many indices that each sequence will overlap with the previous sequence in the batch.
     """
     def __init__(
             self,
-            dataset_path: str,
+            dataset_path_lst: list,
             train_set_size: float,
             n_epochs: int,
             batch_size: int,
             lr: float = 1e-4,
             start_idx: int = None,
             stop_idx: int = None,
-            optimizer: torch.optim.Optimizer = torch.optim.Adam, 
+            optimizer: torch.optim.Optimizer = torch.optim.Adam,
             logging_dir: str = "logs", 
-            logging_steps_ratio: float = 0.01, 
-            save_steps_ratio: float = 0.001, 
+            logging_frequency: float = 0.01, 
+            saving_frequency: float = 0.001, 
             lr_scheduler: bool = False, 
             resume_from_checkpoint: bool = False, 
             checkpoint_path: str = None,
             run_name: str = None,
             reverse: bool = False,
+            batch_stride: int = 16
         ):
         """
         Initializes an instance of the TrainerConfig class.
 
         Args:
-            dataset_path: path to the dataset. Should have no missing values.
+            dataset_path_lst: list of datasets to be used in training. Should have no missing values.
             train_set_size: proportion of dataset to use for training.
             n_epochs: number of epochs to train for.
             batch_size: size of the training batch.
@@ -63,15 +65,16 @@ class TrainerConfig:
             stop_idx: the final index of the dataset to consider. If None, the dataset will end at the end.
             optimizer: optimizer to use.
             logging_dir: directory to log training information.
-            logging_steps_ratio: frequency (in epochs) of logging training information.
-            save_steps_ratio: frequency (in epochs) of saving model checkpoints.
+            logging_frequency: frequency of logging training information.
+            saving_frequency: frequency of saving model checkpoints.
             lr_scheduler: whether or not to use a learingin rate scheduler
             resume_from_checkpoint: whether or not to resume training from a checkpoint.
             checkpoint_path: path to checkpoint to resume from.
             run_name: name of the run.
             reverse: whether or not to reverse the dataset for use in bidirectional models.
+            batch_stride: by how many indices that each sequence will overlap with the previous sequence in the batch.
         """
-        self.dataset_path = dataset_path
+        self.dataset_path_lst = dataset_path_lst
         self.train_set_size = train_set_size
         self.n_epochs = n_epochs
         self.batch_size = batch_size
@@ -80,8 +83,8 @@ class TrainerConfig:
         self.stop_idx = stop_idx
         self.optimizer = optimizer
         self.logging_dir = logging_dir
-        self.logging_steps_ratio = logging_steps_ratio
-        self.save_steps_ratio = save_steps_ratio
+        self.logging_frequency = logging_frequency
+        self.saving_frequency = saving_frequency
         self.lr_scheduler = lr_scheduler
         self.resume_from_checkpoint = resume_from_checkpoint
         self.checkpoint_path = checkpoint_path
@@ -90,6 +93,7 @@ class TrainerConfig:
         else:
             self.run_name = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.reverse = reverse
+        self.batch_stride = batch_stride
 
     def copy(self):
         """
@@ -98,12 +102,13 @@ class TrainerConfig:
         return deepcopy(self)
     
     def __str__(self):
-        return f"""TrainerConfig( dataset_path={self.dataset_path}, train_set_size={self.train_set_size}, n_epochs={self.n_epochs}, 
-                        batch_size={self.batch_size}, lr={self.lr}, start_idx={self.start_idx}, 
-                        stop_idx={self.stop_idx}, optimizer={self.optimizer}, logging_dir={self.logging_dir}, 
-                        logging_steps_ratio={self.logging_steps_ratio}, save_steps_ratio={self.save_steps_ratio}, lr_scheduler={self.lr_scheduler}, 
-                        resume_from_checkpoint={self.resume_from_checkpoint}, checkpoint_path={self.checkpoint_path}, run_name={self.run_name}, 
-                        reverse={self.reverse})
+        return f"""TrainerConfig( dataset_path_lst: {self.dataset_path_lst}, 
+            train_set_size: {self.train_set_size}, n_epochs: {self.n_epochs}, 
+            batch_size: {self.batch_size}, lr: {self.lr}, start_idx: {self.start_idx}, 
+            stop_idx: {self.stop_idx}, optimizer: {self.optimizer}, logging_dir: {self.logging_dir}, 
+            logging_frequency: {self.logging_frequency}, saving_frequency: {self.saving_frequency}, lr_scheduler: {self.lr_scheduler}, 
+            resume_from_checkpoint: {self.resume_from_checkpoint}, checkpoint_path: {self.checkpoint_path}, run_name: {self.run_name}, 
+            reverse: {self.reverse}, batch_stride: {self.batch_stride})
         """
 
 class BidiMLPTrainerConfig(TrainerConfig):
@@ -120,8 +125,8 @@ class BidiMLPTrainerConfig(TrainerConfig):
         stop_idx: the final index of the dataset to consider. If None, the dataset will end at the end.
         optimizer: which optimizer to use.
         logging_dir: directory to log training information.
-        logging_steps_ratio: frequency (in epochs) of logging training information.
-        save_steps_ratio: frequency (in epochs) of saving model checkpoints.
+        logging_frequency: frequency of logging training information.
+        saving_frequency: frequency of saving model checkpoints.
         lr_scheduler: whether or not to use a learning rate scheduler
         resume_from_checkpoint: whether or not to resume training from a checkpoint.
         checkpoint_path: path to checkpoint to resume from.
@@ -142,8 +147,8 @@ class BidiMLPTrainerConfig(TrainerConfig):
             stop_idx: int = None,
             optimizer: torch.optim.Optimizer = torch.optim.Adam, 
             logging_dir: str = "logs", 
-            logging_steps_ratio: float = 0.01, 
-            save_steps_ratio: float = 0.001, 
+            logging_frequency: float = 0.01, 
+            saving_frequency: float = 0.001, 
             lr_scheduler: bool = False, 
             resume_from_checkpoint: bool = False, 
             checkpoint_path: str = None,
@@ -166,8 +171,8 @@ class BidiMLPTrainerConfig(TrainerConfig):
             stop_idx: the final index of the dataset to consider. If None, the dataset will end at the end.
             optimizer: optimizer to use.
             logging_dir: directory to log training information.
-            logging_steps_ratio: frequency (in epochs) of logging training information.
-            save_steps_ratio: frequency (in epochs) of saving model checkpoints.
+            logging_frequency: frequency of logging training information.
+            saving_frequency: frequency of saving model checkpoints.
             lr_scheduler: whether or not to use a learingin rate scheduler
             resume_from_checkpoint: whether or not to resume training from a checkpoint.
             checkpoint_path: path to checkpoint to resume from.
@@ -187,8 +192,8 @@ class BidiMLPTrainerConfig(TrainerConfig):
             stop_idx=stop_idx,
             optimizer=optimizer,
             logging_dir=logging_dir,
-            logging_steps_ratio=logging_steps_ratio,
-            save_steps_ratio=save_steps_ratio,
+            logging_frequency=logging_frequency,
+            saving_frequency=saving_frequency,
             lr_scheduler=lr_scheduler,
             resume_from_checkpoint=resume_from_checkpoint,
             checkpoint_path=checkpoint_path,
@@ -201,8 +206,8 @@ class BidiMLPTrainerConfig(TrainerConfig):
     
     def __str__(self):
         return f"""
-        BidiMLPTrainerConfig( n_epochs={self.n_epochs}, lr={self.lr}, optimizer={self.optimizer}, 
-                            lr_scheduler={self.lr_scheduler}, ablation_max={self.ablation_max},
-                            lstm_f_cpt_file={self.lstm_f_cpt_file}, 
-                            lstm_b_cpt_file={self.lstm_b_cpt_file})
+        BidiMLPTrainerConfig( n_epochs: {self.n_epochs}, lr: {self.lr}, optimizer: {self.optimizer}, 
+                            lr_scheduler: {self.lr_scheduler}, ablation_max: {self.ablation_max},
+                            lstm_f_cpt_file: {self.lstm_f_cpt_file}, 
+                            lstm_b_cpt_file: {self.lstm_b_cpt_file})
         """

@@ -33,7 +33,6 @@ from src.models.LSTMs import LSTM, BidirectionalLSTM
 from src.models.TimeGPT import TimeGPT
 from src.models.TimesFM import TimesFM
 from src.models.TempoGPT import TempoGPT
-from statsmodels.tsa.seasonal import STL
 
 
 ### Global Styling ###
@@ -211,8 +210,7 @@ class DirectEvaluation:
                 y = self.y_scaler.transform(y)
 
             if isinstance(self.model, TempoGPT):
-                trend_stamp, seasonal_stamp, resid_stamp = self._stl_resolve(y, units=units)
-                self.model.set_str(trend_stamp, seasonal_stamp, resid_stamp)
+                self.model._stl_resolve(mode = "val", data_val = torch.tensor(y), dataset_path=file_path, units=units)
 
             if reverse:
                 x,y = x[::-1], y[::-1]
@@ -301,21 +299,3 @@ class DirectEvaluation:
         plt.legend()
         plt.show()
 
-
-    def _stl_resolve(self, y: np.ndarray, units: str = "s"):
-        """
-        STL Global Decomposition
-        """
-        if units == "s":
-            period = 60
-        elif units == "min":
-            period = 60*24
-        elif units == "h":
-            period = 24
-        else:
-            raise NotImplementedError("Only seconds, minutes and hours are supported right now. Fix if getting this error.")
-        res = STL(y[:,0], period=period).fit()
-        trend_stamp = res.trend.reshape(-1,1)
-        seasonal_stamp = res.seasonal.reshape(-1,1)
-        resid_stamp = res.resid.reshape(-1,1)
-        return trend_stamp, seasonal_stamp, resid_stamp

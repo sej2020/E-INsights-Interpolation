@@ -31,8 +31,8 @@ parser.add_argument("--batch_size", type=int, default=16)
 parser.add_argument("--lr", type=float, default=0.001)
 parser.add_argument("--start_idx", type=int, default=None)
 parser.add_argument("--stop_idx", type=int, default=None)
-parser.add_argument("--logging_steps_ratio", type=float, default=0.1)
-parser.add_argument("--save_steps_ratio", type=float, default=0.1)
+parser.add_argument("--logging_frequency", type=float, default=0.1)
+parser.add_argument("--saving_frequency", type=float, default=0.1)
 parser.add_argument("--lr_scheduler", action=argparse.BooleanOptionalAction, default=True)
 parser.add_argument("--resume_from_checkpoint", action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument("--checkpoint_path", type=str, default=None)
@@ -76,8 +76,8 @@ trainer_config = BidiMLPTrainerConfig(
         stop_idx = args.stop_idx,
         optimizer = torch.optim.Adam,
         logging_dir = LOGGING_DIR,
-        logging_steps_ratio = args.logging_steps_ratio,
-        save_steps_ratio = args.save_steps_ratio,
+        logging_frequency = args.logging_frequency,
+        saving_frequency = args.saving_frequency,
         lr_scheduler = args.lstm_lr_scheduler,
         resume_from_checkpoint = False,
         checkpoint_path = None,

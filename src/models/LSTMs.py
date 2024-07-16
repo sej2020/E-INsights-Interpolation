@@ -14,8 +14,8 @@ Typical usage example:
 ...     stop_idx = None,
 ...     optimizer = torch.optim.Adam,
 ...     logging_dir = "logs",
-...     logging_steps_ratio = 0.1,
-...     save_steps_ratio = 0.01,
+...     logging_frequency = 0.1,
+...     saving_frequency = 0.01,
 ...     lr_scheduler = False,
 ...     resume_from_checkpoint = False,
 ...     checkpoint_path = None
@@ -213,8 +213,8 @@ class LSTM(torch.nn.Module):
         writer_path = pathlib.Path(f"{self.cfg.logging_dir}/{self.cfg.run_name}/tensorboard")
         writer_path.mkdir(parents=True, exist_ok=True)
         writer = SummaryWriter(log_dir=writer_path)
-        logging_steps = int(1 / self.cfg.logging_steps_ratio)
-        checkpointing_steps = int(1 / self.cfg.save_steps_ratio)
+        logging_steps = int(1 / self.cfg.logging_frequency)
+        checkpointing_steps = int(1 / self.cfg.saving_frequency)
 
         if self.cfg.lr_scheduler:
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, self.cfg.n_epochs)
@@ -530,8 +530,8 @@ class BidirectionalLSTM(torch.nn.Module):
         writer_path = pathlib.Path(f"{self.cfg.logging_dir}/{self.cfg.run_name}/tensorboard")
         writer_path.mkdir(parents=True, exist_ok=True)
         writer = SummaryWriter(log_dir=writer_path)
-        logging_steps = int(1 / self.cfg.logging_steps_ratio)
-        checkpointing_steps = int(1 / self.cfg.save_steps_ratio)
+        logging_steps = int(1 / self.cfg.logging_frequency)
+        checkpointing_steps = int(1 / self.cfg.saving_frequency)
 
         if self.cfg.lr_scheduler:
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, self.cfg.n_epochs)
