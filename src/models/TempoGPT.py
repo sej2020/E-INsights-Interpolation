@@ -269,7 +269,7 @@ class TempoGPT:
         criterion = torch.nn.MSELoss()
         optimizer = self.trainer_cfg.optimizer(self.model.parameters(), lr=self.trainer_cfg.lr)
 
-        pbar = tqdm.tqdm(range(self.trainer_cfg.n_epochs), disable=False)
+        pbar = tqdm.tqdm(range(self.trainer_cfg.n_epochs), disable=self.trainer_cfg.disable_tqdm)
         writer_path = pathlib.Path(f"{self.trainer_cfg.logging_dir}/{self.trainer_cfg.run_name}/tensorboard")
         writer_path.mkdir(parents=True, exist_ok=True)
         writer = SummaryWriter(log_dir=writer_path)
@@ -289,6 +289,7 @@ class TempoGPT:
                 iterable=range(self.checkpoint_dict["epoch"] + 1, self.trainer_cfg.n_epochs),
                 total=self.trainer_cfg.n_epochs,
                 initial=self.checkpoint_dict["epoch"] + 1,
+                disable=self.trainer_cfg.disable_tqdm
             )
 
         sequencerizer = lambda x: torch.unfold_copy(

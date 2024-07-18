@@ -26,6 +26,7 @@ class TrainerConfig:
         logging_frequency: frequency of logging training information.
         saving_frequency: frequency of saving model checkpoints.
         lr_scheduler: whether or not to use a learning rate scheduler
+        disable_tqdm: whether or not to disable the tqdm progress bar.
         resume_from_checkpoint: whether or not to resume training from a checkpoint.
         checkpoint_path: path to checkpoint to resume from.
         run_name: name of the run.
@@ -46,6 +47,7 @@ class TrainerConfig:
             logging_frequency: float = 0.01, 
             saving_frequency: float = 0.001, 
             lr_scheduler: bool = False, 
+            disable_tqdm: bool = False,
             resume_from_checkpoint: bool = False, 
             checkpoint_path: str = None,
             run_name: str = None,
@@ -68,6 +70,7 @@ class TrainerConfig:
             logging_frequency: frequency of logging training information.
             saving_frequency: frequency of saving model checkpoints.
             lr_scheduler: whether or not to use a learingin rate scheduler
+            disable_tqdm: whether or not to disable the tqdm progress bar.
             resume_from_checkpoint: whether or not to resume training from a checkpoint.
             checkpoint_path: path to checkpoint to resume from.
             run_name: name of the run.
@@ -86,6 +89,7 @@ class TrainerConfig:
         self.logging_frequency = logging_frequency
         self.saving_frequency = saving_frequency
         self.lr_scheduler = lr_scheduler
+        self.disable_tqdm = disable_tqdm
         self.resume_from_checkpoint = resume_from_checkpoint
         self.checkpoint_path = checkpoint_path
         if run_name:
