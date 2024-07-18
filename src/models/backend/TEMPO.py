@@ -374,11 +374,9 @@ class TEMPO(nn.Module):
     def forward(self, x, itr, trend, season, noise, test=False):
         B, L, M = x.shape # 4, 512, 1
 
-        print("Norming...", flush=True)
         x = self.rev_in_trend(x, 'norm')
 
         original_x = x
-        print("Getting local trend, season, noise...", flush=True)
         trend_local = self.moving_avg(x)
         trend_local = self.map_trend(trend_local.squeeze()).unsqueeze(2)
         season_local = x - trend_local
@@ -391,7 +389,6 @@ class TEMPO(nn.Module):
         season, means_season, stdev_season = self.get_norm(season)
         noise, means_noise, stdev_noise = self.get_norm(noise)
 
-        print("Getting t,s,r loss...", flush=True)
         if trend is not None:
             trend_local_l = criterion(trend, trend_local)
             season_local_l = criterion(season, season_local)
@@ -405,13 +402,11 @@ class TEMPO(nn.Module):
                 print("noise local loss", torch.mean(noise_local_l))
 
 
-        print("Getting patches...", flush=True)
         trend = self.get_patch(trend_local)
         season = self.get_patch(season_local)
         noise = self.get_patch(noise_local)
 
 
-        print("Getting embeddings...", flush=True)    
         trend = self.in_layer_trend(trend) # 4, 64, 768
         if self.is_gpt and self.prompt == 1:
             if self.pool:
@@ -446,7 +441,6 @@ class TEMPO(nn.Module):
 
         x_all = torch.cat((trend, season, noise), dim=1)
 
-        print("Running GPT2...", flush=True)
         x = self.gpt2_trend(inputs_embeds =x_all).last_hidden_state 
         
         if self.prompt == 1:
@@ -462,7 +456,6 @@ class TEMPO(nn.Module):
             season  = x[:, self.patch_num:2*self.patch_num, :]  
             noise = x[:, 2*self.patch_num:, :] 
             
-        print("Sending through output layers...", flush=True)
         trend = self.out_layer_trend(trend.reshape(B*M, -1)) # 4, 96
         trend = rearrange(trend, '(b m) l -> b l m', b=B) # 4, 96, 1
         
@@ -482,5 +475,4 @@ class TEMPO(nn.Module):
         outputs = self.rev_in_trend(outputs, 'denorm')
         # if self.pool:
         #     return outputs, loss_local #loss_local - reduce_sim_trend - reduce_sim_season - reduce_sim_noise
-        print("Done with forward pass", flush=True)
         return outputs, loss_local

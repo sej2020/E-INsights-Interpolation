@@ -34,6 +34,7 @@ parser.add_argument("--logging_frequency", type=float, default=0.1)
 parser.add_argument("--saving_frequency", type=float, default=0.1)
 parser.add_argument("--lr_scheduler", action=argparse.BooleanOptionalAction, default=True)
 parser.add_argument("--resume_from_checkpoint", action=argparse.BooleanOptionalAction, default=False)
+parser.add_argument("--disable_tqdm", action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument("--checkpoint_path", type=str, default=None)
 parser.add_argument("--run_name", type=str, default=None)
 parser.add_argument("--device", type=str, choices=["cpu", "cuda"], default="cpu")
@@ -82,7 +83,6 @@ tempo_trainer_config = TrainerConfig(
     batch_stride=args.batch_stride
     )
 
-print("Starting training", flush=True)
 model.fine_tune(tempo_trainer_config)
 print(f"Training complete for {NAME}", flush=True)
 print(f"Logs saved at {LOGGING_DIR}: don't forget to clean up the logging directory when you're done", flush=True)
