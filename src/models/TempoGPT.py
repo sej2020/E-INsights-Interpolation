@@ -279,7 +279,7 @@ class TempoGPT:
         if self.trainer_cfg.lr_scheduler:
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, self.trainer_cfg.n_epochs)
 
-        # TBD
+        print("Loading checkpoint...", flush=True)
         if self.trainer_cfg.resume_from_checkpoint:
             self.checkpoint_dict = torch.load(self.trainer_cfg.checkpoint_path)
             model_dict = self.checkpoint_dict['model_state_dict']
@@ -300,15 +300,19 @@ class TempoGPT:
             )
         
         # Go through the data epoch_n times
+        print("Starting epoch loop...", flush=True)
         for epoch_n in pbar:
             epoch_loss = []
             for dataset_path in self.trainer_cfg.dataset_path_lst:
+                print(f"Loading dataset {dataset_path}...", flush=True)
                 df = pd.read_csv(dataset_path, index_col=0)
                 train_idx = int(self.trainer_cfg.train_set_size*len(df))
                 data_train = torch.tensor(df.values[:train_idx], dtype=torch.float32) # [train_len, num_features]
                 data_val = torch.tensor(df.values[train_idx:], dtype=torch.float32) # [val_len, num_features]
+                print(f"Performing STL decomposition on dataset {dataset_path}...", flush=True)
                 self._stl_resolve(mode="train", data_train = data_train.detach().numpy(), data_val = data_val.detach().numpy(), dataset_path=dataset_path)      
                 
+                print("Starting training loop...", flush=True)
                 # doing each feature of the dataset at a time
                 for feat_idx in range(data_train.shape[1]):
                     full_seq_train = data_train[epoch_n:, feat_idx]
@@ -329,6 +333,7 @@ class TempoGPT:
                     seasonal_seqs = seasonal_seqs_raw[perm, :self.config.seq_len]
                     residual_seqs = residual_seqs_raw[perm, :self.config.seq_len]
 
+                    print("Starting batch loop...", flush=True)
                     for batch_n in range(0, sequences.shape[0], self.trainer_cfg.batch_size):
                         batch_x = seqs_x[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, seq_len]
                         batch_y = seqs_y[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, pred_len]
@@ -336,6 +341,7 @@ class TempoGPT:
                         batch_seasonal = seasonal_seqs[batch_n: batch_n + self.trainer_cfg.batch_size]
                         batch_residual = residual_seqs[batch_n: batch_n + self.trainer_cfg.batch_size]
                     
+                        print("Starting forward model pass...", flush=True)
                         outputs, _ = self.model(
                             x = batch_x.unsqueeze(2), # [batch_size, seq_len, 1]
                             itr = 0, 
@@ -344,12 +350,13 @@ class TempoGPT:
                             noise = batch_residual.unsqueeze(2), # [batch_size, seq_len, 1]
                             test = False
                             )  # [batch_size, pred_len, 1]
-
+                        print("Calculating loss...", flush=True)
                         loss = criterion(outputs, batch_y.unsqueeze(2)) # [batch_size, pred_len, 1]
                         loss.backward()
                         optimizer.step()
                         epoch_loss.append(loss.item())
                         optimizer.zero_grad()
+                        print("#"*50, flush=True)
 
             if (epoch_n+1) % checkpointing_steps == 0:
                 self.save_checkpoint({

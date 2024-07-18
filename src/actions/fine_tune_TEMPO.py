@@ -82,6 +82,7 @@ tempo_trainer_config = TrainerConfig(
     batch_stride=args.batch_stride
     )
 
+print("Starting training", flush=True)
 model.fine_tune(tempo_trainer_config)
 print(f"Training complete for {NAME}", flush=True)
 print(f"Logs saved at {LOGGING_DIR}: don't forget to clean up the logging directory when you're done", flush=True)
