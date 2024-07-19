@@ -64,7 +64,7 @@ if args.dataset_path_lst is None:
 else:
     DATASETS = args.dataset_path_lst
 
-model = TempoGPT()
+model = TempoGPT(device=args.device)
 
 tempo_trainer_config = TrainerConfig(
     dataset_path_lst = DATASETS,
