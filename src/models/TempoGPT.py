@@ -333,7 +333,7 @@ class TempoGPT:
                     residual_seqs = residual_seqs_raw[perm, :self.config.seq_len]
 
                     for batch_n in range(0, sequences.shape[0], self.trainer_cfg.batch_size):
-                        print(f"batch {batch_n} of {sequences.shape[0]//self.trainer_cfg.batch_size}", flush=True, end="\r")
+                        print(f"batch {batch_n/self.trainer_cfg.batch_size} of {sequences.shape[0]//self.trainer_cfg.batch_size}", flush=True, end="\r")
                         batch_x = seqs_x[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, seq_len]
                         batch_y = seqs_y[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, pred_len]
                         batch_trend = trend_seqs[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, seq_len]
@@ -422,7 +422,7 @@ class TempoGPT:
                 residual_seqs = residual_seqs_raw[:, :self.config.seq_len]
 
                 for batch_n in range(0, sequences.shape[0], self.trainer_cfg.batch_size):
-                    print(f"batch {batch_n} of {sequences.shape[0]//self.trainer_cfg.batch_size}", flush=True, end="\r")
+                    print(f"batch {batch_n/self.trainer_cfg.batch_size} of {sequences.shape[0]//self.trainer_cfg.batch_size}", flush=True, end="\r")
                     batch_x = seqs_x[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, seq_len]
                     batch_y = seqs_y[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, pred_len]
                     batch_trend = trend_seqs[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, seq_len]
