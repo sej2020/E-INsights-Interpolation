@@ -333,6 +333,7 @@ class TempoGPT:
                     residual_seqs = residual_seqs_raw[perm, :self.config.seq_len]
 
                     for batch_n in range(0, sequences.shape[0], self.trainer_cfg.batch_size):
+                        print(f"batch {batch_n} of {sequences.shape[0]//self.trainer_cfg.batch_size}", flush=True, end="\r")
                         batch_x = seqs_x[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, seq_len]
                         batch_y = seqs_y[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, pred_len]
                         batch_trend = trend_seqs[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, seq_len]
@@ -353,18 +354,23 @@ class TempoGPT:
                         epoch_loss.append(loss.item())
                         optimizer.zero_grad()
 
+            print("#"*50, flush=True)
+            print("Now saving checkpoint...", flush=True)
             if (epoch_n+1) % checkpointing_steps == 0:
                 self.save_checkpoint({
                     "epoch": epoch_n,
                     "model_state_dict": self.model.state_dict(),
                     "optim_state_dict": optimizer.state_dict(),
                 })
+            print("#"*50, flush=True)
 
             if self.trainer_cfg.lr_scheduler:
                 scheduler.step()
             
             pbar.set_description(f"Epoch Loss: {sum(epoch_loss)/len(epoch_loss)}")
             
+            print("#"*50, flush=True)
+            print("Now beginning evaluation...", flush=True)
             if (epoch_n+1) % logging_steps == 0:
                 val_loss = self.evaluate(criterion, sequencerizer)
                 writer.add_scalars(
@@ -372,6 +378,7 @@ class TempoGPT:
                     {"Training" : sum(epoch_loss)/len(epoch_loss), "Validation": sum(val_loss)/len(val_loss)}, 
                     epoch_n
                     )
+            print("#"*50, flush=True)
 
         writer.flush()
         writer.close()
@@ -415,6 +422,7 @@ class TempoGPT:
                 residual_seqs = residual_seqs_raw[:, :self.config.seq_len]
 
                 for batch_n in range(0, sequences.shape[0], self.trainer_cfg.batch_size):
+                    print(f"batch {batch_n} of {sequences.shape[0]//self.trainer_cfg.batch_size}", flush=True, end="\r")
                     batch_x = seqs_x[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, seq_len]
                     batch_y = seqs_y[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, pred_len]
                     batch_trend = trend_seqs[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, seq_len]
