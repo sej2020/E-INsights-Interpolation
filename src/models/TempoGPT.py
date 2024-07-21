@@ -49,7 +49,7 @@ class TempoGPT:
            self.config,
            device=device 
         )
-        self.model.load_state_dict(torch.load(self.config.best_model_path, map_location=torch.device(self.config.device)), strict=False)
+        self.model.load_state_dict(torch.load(self.config.best_model_path, map_location=torch.device(device)), strict=False)
         self.x = None
         self.y = None
         self.train_trend_stamp = None
@@ -88,13 +88,13 @@ class TempoGPT:
         if val_trend_path.exists() and val_seasonal_path.exists() and val_residual_path.exists():
             with open(val_trend_path, 'rb') as f:
                 val_trend_stamp = pickle.load(f)
-                val_trend_stamp.to(self.device)
+                val_trend_stamp = val_trend_stamp.to(self.device)
             with open(val_seasonal_path, 'rb') as f:
                 val_seasonal_stamp = pickle.load(f)
-                val_seasonal_stamp.to(self.device)
+                val_seasonal_stamp = val_seasonal_stamp.to(self.device)
             with open(val_residual_path, 'rb') as f:
                 val_residual_stamp = pickle.load(f)
-                val_residual_stamp.to(self.device)
+                val_residual_stamp = val_residual_stamp.to(self.device)
         elif data_val is None:
             raise Exception("Existing validation STL decomposition files not found. Must provide validation data to perform decomposition.")
         else:
@@ -130,13 +130,13 @@ class TempoGPT:
             if train_trend_path.exists() and train_seasonal_path.exists() and train_residual_path.exists():
                 with open(train_trend_path, 'rb') as f:
                     train_trend_stamp = pickle.load(f)
-                    train_trend_stamp.to(self.device)
+                    train_trend_stamp = train_trend_stamp.to(self.device)
                 with open(train_seasonal_path, 'rb') as f:
                     train_seasonal_stamp = pickle.load(f)
-                    train_seasonal_stamp.to(self.device)
+                    train_seasonal_stamp = train_seasonal_stamp.to(self.device)
                 with open(train_residual_path, 'rb') as f:
                     train_residual_stamp = pickle.load(f)
-                    train_residual_stamp.to(self.device)
+                    train_residual_stamp = train_residual_stamp.to(self.device)
             elif data_train is None:
                 raise Exception("Existing training STL decomposition files not found. Must provide training data to perform decomposition.")
             else:
@@ -307,19 +307,16 @@ class TempoGPT:
         
         # Go through the data epoch_n times
         for epoch_n in pbar:
-            print(f"Epoch {epoch_n}")
             epoch_loss = []
             for dataset_path in self.trainer_cfg.dataset_path_lst:
-                print(f". Dataset: {dataset_path}")
                 df = pd.read_csv(dataset_path, index_col=0)
                 train_idx = int(self.trainer_cfg.train_set_size*len(df))
                 data_train = torch.tensor(df.values[:train_idx], dtype=torch.float32, device=self.device) # [train_len, num_features]
                 data_val = torch.tensor(df.values[train_idx:], dtype=torch.float32, device=self.device) # [val_len, num_features]
-                self._stl_resolve(mode="train", data_train = data_train.detach().numpy(), data_val = data_val.detach().numpy(), dataset_path=dataset_path)      
+                self._stl_resolve(mode="train", data_train = data_train.cpu().detach().numpy(), data_val = data_val.cpu().detach().numpy(), dataset_path=dataset_path)      
                 
                 # doing each feature of the dataset at a time
                 for feat_idx in range(data_train.shape[1]):
-                    print(f".. Feature: {feat_idx}")
                     full_seq_train = data_train[epoch_n:, feat_idx]
                     seq_result = map(sequencerizer,
                         (
@@ -339,7 +336,6 @@ class TempoGPT:
                     residual_seqs = residual_seqs_raw[perm, :self.config.seq_len]
 
                     for batch_n in range(0, sequences.shape[0], self.trainer_cfg.batch_size):
-                        print(f"... batch {batch_n/self.trainer_cfg.batch_size} of {sequences.shape[0]//self.trainer_cfg.batch_size}", flush=True, end="\r")
                         batch_x = seqs_x[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, seq_len]
                         batch_y = seqs_y[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, pred_len]
                         batch_trend = trend_seqs[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, seq_len]
@@ -360,23 +356,18 @@ class TempoGPT:
                         epoch_loss.append(loss.item())
                         optimizer.zero_grad()
 
-            print("#"*50, flush=True)
-            print("Now saving checkpoint...", flush=True)
             if (epoch_n+1) % checkpointing_steps == 0:
                 self.save_checkpoint({
                     "epoch": epoch_n,
                     "model_state_dict": self.model.state_dict(),
                     "optim_state_dict": optimizer.state_dict(),
                 })
-            print("#"*50, flush=True)
 
             if self.trainer_cfg.lr_scheduler:
                 scheduler.step()
             
             pbar.set_description(f"Epoch Loss: {sum(epoch_loss)/len(epoch_loss)}")
             
-            print("#"*50, flush=True)
-            print("Now beginning evaluation...", flush=True)
             if (epoch_n+1) % logging_steps == 0:
                 val_loss = self.evaluate(criterion, sequencerizer)
                 writer.add_scalars(
@@ -384,7 +375,6 @@ class TempoGPT:
                     {"Training" : sum(epoch_loss)/len(epoch_loss), "Validation": sum(val_loss)/len(val_loss)}, 
                     epoch_n
                     )
-            print("#"*50, flush=True)
 
         writer.flush()
         writer.close()
@@ -403,15 +393,13 @@ class TempoGPT:
         """
         val_loss = []
         for dataset_path in self.trainer_cfg.dataset_path_lst:
-            print(f". Dataset: {dataset_path}")
             df = pd.read_csv(dataset_path, index_col=0)
             train_idx = int(self.trainer_cfg.train_set_size*len(df))
             data_val = torch.tensor(df.values[train_idx:], dtype=torch.float32, device=self.device) # [val_len, num_features]
-            self._stl_resolve(mode="val", data_val = data_val.detach().numpy(), dataset_path=dataset_path)      
+            self._stl_resolve(mode="val", data_val = data_val.cpu().detach().numpy(), dataset_path=dataset_path)      
             
             # doing each feature of the dataset at a time
             for feat_idx in range(data_val.shape[1]):
-                print(f".. Feature: {feat_idx}")
                 full_seq_val = data_val[:, feat_idx]
                 seq_result = map(sequencerizer,
                     (
@@ -430,7 +418,6 @@ class TempoGPT:
                 residual_seqs = residual_seqs_raw[:, :self.config.seq_len]
 
                 for batch_n in range(0, sequences.shape[0], self.trainer_cfg.batch_size):
-                    print(f"... batch {batch_n//self.trainer_cfg.batch_size} of {sequences.shape[0]//self.trainer_cfg.batch_size}", flush=True)
                     batch_x = seqs_x[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, seq_len]
                     batch_y = seqs_y[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, pred_len]
                     batch_trend = trend_seqs[batch_n: batch_n + self.trainer_cfg.batch_size] # [batch_size, seq_len]
