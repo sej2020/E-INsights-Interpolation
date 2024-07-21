@@ -142,7 +142,7 @@ class TEMPO(nn.Module):
                 self.prompt_key_dict = nn.ParameterDict({})
                 self.prompt_value_dict = nn.ParameterDict({})
                 # self.summary_map = nn.Linear(self.token_len, 1)
-                self.summary_map = nn.Linear(self.patch_num, 1)
+                self.summary_map = nn.Linear(self.patch_num, 1, device=device)
                 self.pool_size = 30
                 self.top_k = 3
                 self.prompt_len = 3
@@ -261,6 +261,7 @@ class TEMPO(nn.Module):
 
     def select_prompt(self, summary, prompt_mask=None):
         prompt_key_matrix = torch.stack(tuple([self.prompt_key_dict[i] for i in self.prompt_key_dict.keys()]))
+        prompt_key_matrix = prompt_key_matrix.to(summary.device)
         prompt_norm = self.l2_normalize(prompt_key_matrix, dim=1) # Pool_size, C
         summary_reshaped = summary.view(-1, self.patch_num)
         summary_mapped = self.summary_map(summary_reshaped)
@@ -278,6 +279,7 @@ class TEMPO(nn.Module):
 
 
         prompt_value_matrix = torch.stack(tuple([self.prompt_value_dict[i] for i in self.prompt_value_dict.keys()]))
+        prompt_value_matrix = prompt_value_matrix.to(summary.device)
         batched_prompt_raw = prompt_value_matrix[idx].squeeze(1)
         batch_size, top_k, length, c = batched_prompt_raw.shape # [16, 3, 5, 768]
         batched_prompt = batched_prompt_raw.reshape(batch_size, top_k * length, c) 

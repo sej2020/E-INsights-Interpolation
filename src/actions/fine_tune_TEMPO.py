@@ -3,7 +3,7 @@ For fine tuning the TEMPO model on E-INsights data.
 
 Typical usage example:
 ```bash
->>> python -m src.actions.fine_tune_TEMPO
+>>> python -m src.actions.fine_tune_TEMPO --device cuda --batch_size 2048 --batch_stride 64 --disable_tqdm --logging_frequency 0.2 --saving_frequency 0.2
 ```
 And to view the training progress, run the following command in the terminal:
 ```bash
