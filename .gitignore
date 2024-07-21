@@ -4,3 +4,4 @@
 **/TEMPO_checkpoints
 **/output
 *.env
+**/checkpoints
