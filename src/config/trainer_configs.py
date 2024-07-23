@@ -45,7 +45,7 @@ class TrainerConfig:
             optimizer: torch.optim.Optimizer = torch.optim.Adam,
             logging_dir: str = "logs", 
             logging_frequency: float = 0.01, 
-            saving_frequency: float = 0.001, 
+            saving_frequency: float = 0.01, 
             lr_scheduler: bool = False, 
             disable_tqdm: bool = False,
             resume_from_checkpoint: bool = False, 

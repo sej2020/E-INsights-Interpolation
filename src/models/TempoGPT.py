@@ -10,7 +10,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from statsmodels.tsa.seasonal import STL
 from src.config.trainer_configs import TrainerConfig
-import time
+import wandb
 import src.models.backend.TEMPO as TEMPO
 
 # class ToyModel:
@@ -49,6 +49,7 @@ class TempoGPT:
            self.config,
            device=device 
         )
+        self.model = torch.compile(self.model)
         self.model.load_state_dict(torch.load(self.config.best_model_path, map_location=torch.device(device)), strict=False)
         self.x = None
         self.y = None
@@ -253,7 +254,7 @@ class TempoGPT:
         return outputs.detach().numpy() if mode=="test" else outputs
         
     
-    def fine_tune(self, cfg):
+    def fine_tune(self, cfg=None, hp_search=False):
         """
         Fine-tunes the model. To view the training progress, run the following command in the terminal:
         ```bash
@@ -262,23 +263,35 @@ class TempoGPT:
         Clean up the logs directory after training is complete.
 
         Args:
-            cfg: TrainerConfig object.
+            cfg: TrainerConfig object OR dictionary of training hyperparameters if hp_search is True.
+            hp_search: whether this fine-tuning run is a part of a wandb hyperparameter search. Default is False.
         """
-        self.trainer_cfg = cfg
+        wandb.init(project="search-hp-TempoGPT", config=cfg)
+        self.trainer_cfg = wandb.config if hp_search else cfg
 
-        # writing out a text file to the logging directory with the string of the trainer config
-        hp_path = pathlib.Path(f"{self.trainer_cfg.logging_dir}/{self.trainer_cfg.run_name}")
-        hp_path.mkdir(parents=True, exist_ok=True)
-        with open(f"{hp_path}/trainer_config.txt", "w") as file:
-            file.write(str(self.trainer_cfg))
+        if not hp_search:
+            hp_path = pathlib.Path(f"{self.trainer_cfg.logging_dir}/{self.trainer_cfg.run_name}")
+            hp_path.mkdir(parents=True, exist_ok=True)
+            # writing out a text file to the logging directory with the string of the trainer config
+            with open(f"{hp_path}/trainer_config.txt", "w") as file:
+                file.write(str(self.trainer_cfg))
 
         criterion = torch.nn.MSELoss()
-        optimizer = self.trainer_cfg.optimizer(self.model.parameters(), lr=self.trainer_cfg.lr)
+        if hp_search:
+            if self.trainer_cfg.optimizer == "adam":
+                optimizer = torch.optim.Adam(self.model.parameters(), lr=self.trainer_cfg.lr)
+            elif self.trainer_cfg.optimizer == "adamw":
+                optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.trainer_cfg.lr)
+            else:
+                raise Exception("Invalid optimizer.")
+        else:
+            optimizer = self.trainer_cfg.optimizer(self.model.parameters(), lr=self.trainer_cfg.lr)
 
         pbar = tqdm.tqdm(range(self.trainer_cfg.n_epochs), disable=self.trainer_cfg.disable_tqdm)
-        writer_path = pathlib.Path(f"{self.trainer_cfg.logging_dir}/{self.trainer_cfg.run_name}/tensorboard")
-        writer_path.mkdir(parents=True, exist_ok=True)
-        writer = SummaryWriter(log_dir=writer_path)
+        if not hp_search:
+            writer_path = pathlib.Path(f"{self.trainer_cfg.logging_dir}/{self.trainer_cfg.run_name}/tensorboard")
+            writer_path.mkdir(parents=True, exist_ok=True)
+            writer = SummaryWriter(log_dir=writer_path)
         logging_steps = int(1 / self.trainer_cfg.logging_frequency)
         checkpointing_steps = int(1 / self.trainer_cfg.saving_frequency)
 
@@ -356,28 +369,38 @@ class TempoGPT:
                         epoch_loss.append(loss.item())
                         optimizer.zero_grad()
 
-            if (epoch_n+1) % checkpointing_steps == 0:
-                self.save_checkpoint({
-                    "epoch": epoch_n,
-                    "model_state_dict": self.model.state_dict(),
-                    "optim_state_dict": optimizer.state_dict(),
-                })
+            if not hp_search:
+                if (epoch_n+1) % checkpointing_steps == 0:
+                    self.save_checkpoint({
+                        "epoch": epoch_n,
+                        "model_state_dict": self.model.state_dict(),
+                        "optim_state_dict": optimizer.state_dict(),
+                    })
 
             if self.trainer_cfg.lr_scheduler:
                 scheduler.step()
             
             pbar.set_description(f"Epoch Loss: {sum(epoch_loss)/len(epoch_loss)}")
             
+            if hp_search:
+                wandb.log({"train_loss": sum(epoch_loss)/len(epoch_loss), "epoch": epoch_n})
+
             if (epoch_n+1) % logging_steps == 0:
                 val_loss = self.evaluate(criterion, sequencerizer)
-                writer.add_scalars(
-                    "Loss", 
-                    {"Training" : sum(epoch_loss)/len(epoch_loss), "Validation": sum(val_loss)/len(val_loss)}, 
-                    epoch_n
-                    )
+                if hp_search:
+                    wandb.log({"val_loss": sum(val_loss)/len(val_loss), "epoch": epoch_n})
+                else:
+                    writer.add_scalars(
+                        "Loss", 
+                        {"Training" : sum(epoch_loss)/len(epoch_loss), "Validation": sum(val_loss)/len(val_loss)}, 
+                        epoch_n
+                        )
 
-        writer.flush()
-        writer.close()
+        if hp_search:
+            wandb.finish()
+        else:
+            writer.flush()
+            writer.close()
     
 
     def evaluate(self, criterion: callable, sequencerizer: callable) -> list:
