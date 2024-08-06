@@ -5,3 +5,5 @@
 *.env
 **/checkpoints
 **/wandb
+**/gpu_logs
+**/output
