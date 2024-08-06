@@ -49,7 +49,6 @@ class TempoGPT:
            self.config,
            device=device 
         )
-        self.model = torch.compile(self.model)
         self.model.load_state_dict(torch.load(self.config.best_model_path, map_location=torch.device(device)), strict=False)
         self.x = None
         self.y = None
@@ -266,7 +265,8 @@ class TempoGPT:
             cfg: TrainerConfig object OR dictionary of training hyperparameters if hp_search is True.
             hp_search: whether this fine-tuning run is a part of a wandb hyperparameter search. Default is False.
         """
-        wandb.init(project="search-hp-TempoGPT", config=cfg)
+        if hp_search:
+            wandb.init(project="search-hp-TempoGPT", config=cfg)
         self.trainer_cfg = wandb.config if hp_search else cfg
 
         if not hp_search:
@@ -317,7 +317,6 @@ class TempoGPT:
             self.config.seq_len + self.config.pred_len, 
             self.trainer_cfg.batch_stride
             )
-        
         # Go through the data epoch_n times
         for epoch_n in pbar:
             epoch_loss = []
