@@ -2,5 +2,6 @@
 **/archive
 **/data
 **/TEMPO_checkpoints
-**/output
 *.env
+**/wandb
+**/gpu_logs

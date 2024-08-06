@@ -10,7 +10,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from statsmodels.tsa.seasonal import STL
 from src.config.trainer_configs import TrainerConfig
-import time
+import wandb
 import src.models.backend.TEMPO as TEMPO
 
 # class ToyModel:
@@ -36,20 +36,21 @@ class TempoGPT:
         val_residual_stamp: residual stamp for validation
         device: device to run the model on.
     """
-    def __init__(self, device: str = "cpu"):
+    def __init__(self, device: str = "cpu", config = None):
         """
         Initializes an instance of the TempoGPT class.
 
         Args:
             device: device to run the model on. Default is "cpu".
+            config: configuration for TEMPO checkpoint model. Default is None, which uses the default configuration.
         """
-        self.config = TempoConfig()
+        self.config = TempoConfig() if config == None else config
         # self.model = ToyModel()
         self.model = TEMPO.TEMPO(
            self.config,
            device=device 
         )
-        self.model.load_state_dict(torch.load(self.config.best_model_path, map_location=torch.device(self.config.device)), strict=False)
+        self.model.load_state_dict(torch.load(self.config.best_model_path, map_location=torch.device(device)), strict=False)
         self.x = None
         self.y = None
         self.train_trend_stamp = None
@@ -88,24 +89,27 @@ class TempoGPT:
         if val_trend_path.exists() and val_seasonal_path.exists() and val_residual_path.exists():
             with open(val_trend_path, 'rb') as f:
                 val_trend_stamp = pickle.load(f)
+                val_trend_stamp = val_trend_stamp.to(self.device)
             with open(val_seasonal_path, 'rb') as f:
                 val_seasonal_stamp = pickle.load(f)
+                val_seasonal_stamp = val_seasonal_stamp.to(self.device)
             with open(val_residual_path, 'rb') as f:
                 val_residual_stamp = pickle.load(f)
+                val_residual_stamp = val_residual_stamp.to(self.device)
         elif data_val is None:
             raise Exception("Existing validation STL decomposition files not found. Must provide validation data to perform decomposition.")
         else:
             val_stl_root = pathlib.Path(dataset_path).parent / "stl"
             val_stl_root.mkdir(parents=True, exist_ok=True)
 
-            val_trend_stamp = torch.empty((data_val.shape[0], data_val.shape[1]), dtype=torch.float32)
-            val_seasonal_stamp = torch.empty((data_val.shape[0], data_val.shape[1]), dtype=torch.float32)
-            val_residual_stamp = torch.empty((data_val.shape[0], data_val.shape[1]), dtype=torch.float32)
+            val_trend_stamp = torch.empty((data_val.shape[0], data_val.shape[1]), dtype=torch.float32, device=self.device)
+            val_seasonal_stamp = torch.empty((data_val.shape[0], data_val.shape[1]), dtype=torch.float32, device=self.device)
+            val_residual_stamp = torch.empty((data_val.shape[0], data_val.shape[1]), dtype=torch.float32, device=self.device)
             for feat_idx in range(data_val.shape[1]):
                 res_val = STL(data_val[:, feat_idx], period=period).fit()
-                val_trend_stamp[:, feat_idx] = torch.tensor(res_val.trend, dtype=torch.float32)
-                val_seasonal_stamp[:, feat_idx] = torch.tensor(res_val.seasonal, dtype=torch.float32)
-                val_residual_stamp[:, feat_idx] = torch.tensor(res_val.resid, dtype=torch.float32)
+                val_trend_stamp[:, feat_idx] = torch.tensor(res_val.trend, dtype=torch.float32, device=self.device)
+                val_seasonal_stamp[:, feat_idx] = torch.tensor(res_val.seasonal, dtype=torch.float32, device=self.device)
+                val_residual_stamp[:, feat_idx] = torch.tensor(res_val.resid, dtype=torch.float32, device=self.device)
 
             with open(val_trend_path, 'wb') as f:
                 pickle.dump(val_trend_stamp, f)
@@ -127,24 +131,27 @@ class TempoGPT:
             if train_trend_path.exists() and train_seasonal_path.exists() and train_residual_path.exists():
                 with open(train_trend_path, 'rb') as f:
                     train_trend_stamp = pickle.load(f)
+                    train_trend_stamp = train_trend_stamp.to(self.device)
                 with open(train_seasonal_path, 'rb') as f:
                     train_seasonal_stamp = pickle.load(f)
+                    train_seasonal_stamp = train_seasonal_stamp.to(self.device)
                 with open(train_residual_path, 'rb') as f:
                     train_residual_stamp = pickle.load(f)
+                    train_residual_stamp = train_residual_stamp.to(self.device)
             elif data_train is None:
                 raise Exception("Existing training STL decomposition files not found. Must provide training data to perform decomposition.")
             else:
                 train_stl_root = pathlib.Path(dataset_path).parent / "stl"
                 train_stl_root.mkdir(parents=True, exist_ok=True)
 
-                train_trend_stamp = torch.empty((data_train.shape[0], data_train.shape[1]), dtype=torch.float32)
-                train_seasonal_stamp = torch.empty((data_train.shape[0], data_train.shape[1]), dtype=torch.float32)
-                train_residual_stamp = torch.empty((data_train.shape[0], data_train.shape[1]), dtype=torch.float32)
+                train_trend_stamp = torch.empty((data_train.shape[0], data_train.shape[1]), dtype=torch.float32, device=self.device)
+                train_seasonal_stamp = torch.empty((data_train.shape[0], data_train.shape[1]), dtype=torch.float32, device=self.device)
+                train_residual_stamp = torch.empty((data_train.shape[0], data_train.shape[1]), dtype=torch.float32, device=self.device)
                 for feat_idx in range(data_train.shape[1]):
                     res_train = STL(data_train[:, feat_idx], period=period).fit()
-                    train_trend_stamp[:, feat_idx] = torch.tensor(res_train.trend, dtype=torch.float32)
-                    train_seasonal_stamp[:, feat_idx] = torch.tensor(res_train.seasonal, dtype=torch.float32)
-                    train_residual_stamp[:, feat_idx] = torch.tensor(res_train.resid, dtype=torch.float32)
+                    train_trend_stamp[:, feat_idx] = torch.tensor(res_train.trend, dtype=torch.float32, device=self.device)
+                    train_seasonal_stamp[:, feat_idx] = torch.tensor(res_train.seasonal, dtype=torch.float32, device=self.device)
+                    train_residual_stamp[:, feat_idx] = torch.tensor(res_train.resid, dtype=torch.float32, device=self.device)
 
                 with open(train_trend_path, 'wb') as f:
                     pickle.dump(train_trend_stamp, f)
@@ -205,7 +212,7 @@ class TempoGPT:
         
         x_tensor = torch.tensor(x, dtype=torch.float32) # [ablation_len, 1]
 
-        pre_ablation_context = self.y[:ablation_start] # [pre_ab_len, 1] - same for s,t,r
+        pre_ablation_context = torch.tensor(self.y[:ablation_start], dtype=torch.float32) # [pre_ab_len, 1] - same for s,t,r
         if mode == "train":
             trend = self.train_trend_stamp[:ablation_start]
             seasonal = self.train_seasonal_stamp[:ablation_start]
@@ -225,10 +232,10 @@ class TempoGPT:
 
         else:
             # paddin'
-            pre_ablation_context = torch.nn.functional.pad(pre_ablation_context, (0, 0, self.config.seq_len - len(pre_ablation_context), 0), mode='replicate') # [seq_len, 1] - same for s,t,r
-            trend = torch.nn.functional.pad(trend, (0, 0, self.config.seq_len - len(trend), 0), mode='replicate')
-            seasonal = torch.nn.functional.pad(seasonal, (0, 0, self.config.seq_len - len(seasonal), 0), mode='replicate')
-            residual = torch.nn.functional.pad(residual, (0, 0, self.config.seq_len - len(residual), 0), mode='replicate')
+            pre_ablation_context = torch.nn.functional.pad(pre_ablation_context.T, (self.config.seq_len - len(pre_ablation_context), 0), mode='replicate').T # [seq_len, 1] - same for s,t,r
+            trend = torch.nn.functional.pad(trend.T, (self.config.seq_len - len(trend), 0), mode='replicate').T
+            seasonal = torch.nn.functional.pad(seasonal.T, (self.config.seq_len - len(seasonal), 0), mode='replicate').T
+            residual = torch.nn.functional.pad(residual.T, (self.config.seq_len - len(residual), 0), mode='replicate').T
 
         pre_ablation_context = pre_ablation_context.unsqueeze(0) # [1, seq_len, 1] - same for s,t,r
         trend = trend.unsqueeze(0)
@@ -236,7 +243,7 @@ class TempoGPT:
         residual = residual.unsqueeze(0)
         
         outputs, _ = self.model(
-            x=x_tensor.repeat(2,1,1), 
+            x=pre_ablation_context.repeat(2,1,1), 
             itr=0, 
             trend=trend.repeat(2,1,1), 
             season=seasonal.repeat(2,1,1), 
@@ -247,7 +254,7 @@ class TempoGPT:
         return outputs.detach().numpy() if mode=="test" else outputs
         
     
-    def fine_tune(self, cfg):
+    def fine_tune(self, cfg=None, hp_search=False):
         """
         Fine-tunes the model. To view the training progress, run the following command in the terminal:
         ```bash
@@ -256,23 +263,36 @@ class TempoGPT:
         Clean up the logs directory after training is complete.
 
         Args:
-            cfg: TrainerConfig object.
+            cfg: TrainerConfig object OR dictionary of training hyperparameters if hp_search is True.
+            hp_search: whether this fine-tuning run is a part of a wandb hyperparameter search. Default is False.
         """
-        self.trainer_cfg = cfg
+        if hp_search:
+            wandb.init(project="search-hp-TempoGPT", config=cfg)
+        self.trainer_cfg = wandb.config if hp_search else cfg
 
-        # writing out a text file to the logging directory with the string of the trainer config
-        hp_path = pathlib.Path(f"{self.trainer_cfg.logging_dir}/{self.trainer_cfg.run_name}")
-        hp_path.mkdir(parents=True, exist_ok=True)
-        with open(f"{hp_path}/trainer_config.txt", "w") as file:
-            file.write(str(self.trainer_cfg))
+        if not hp_search:
+            hp_path = pathlib.Path(f"{self.trainer_cfg.logging_dir}/{self.trainer_cfg.run_name}")
+            hp_path.mkdir(parents=True, exist_ok=True)
+            # writing out a text file to the logging directory with the string of the trainer config
+            with open(f"{hp_path}/trainer_config.txt", "w") as file:
+                file.write(str(self.trainer_cfg))
 
         criterion = torch.nn.MSELoss()
-        optimizer = self.trainer_cfg.optimizer(self.model.parameters(), lr=self.trainer_cfg.lr)
+        if hp_search:
+            if self.trainer_cfg.optimizer == "adam":
+                optimizer = torch.optim.Adam(self.model.parameters(), lr=self.trainer_cfg.lr)
+            elif self.trainer_cfg.optimizer == "adamw":
+                optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.trainer_cfg.lr)
+            else:
+                raise Exception("Invalid optimizer.")
+        else:
+            optimizer = self.trainer_cfg.optimizer(self.model.parameters(), lr=self.trainer_cfg.lr)
 
-        pbar = tqdm.tqdm(range(self.trainer_cfg.n_epochs), disable=False)
-        writer_path = pathlib.Path(f"{self.trainer_cfg.logging_dir}/{self.trainer_cfg.run_name}/tensorboard")
-        writer_path.mkdir(parents=True, exist_ok=True)
-        writer = SummaryWriter(log_dir=writer_path)
+        pbar = tqdm.tqdm(range(self.trainer_cfg.n_epochs), disable=self.trainer_cfg.disable_tqdm)
+        if not hp_search:
+            writer_path = pathlib.Path(f"{self.trainer_cfg.logging_dir}/{self.trainer_cfg.run_name}/tensorboard")
+            writer_path.mkdir(parents=True, exist_ok=True)
+            writer = SummaryWriter(log_dir=writer_path)
         logging_steps = int(1 / self.trainer_cfg.logging_frequency)
         checkpointing_steps = int(1 / self.trainer_cfg.saving_frequency)
 
@@ -289,6 +309,7 @@ class TempoGPT:
                 iterable=range(self.checkpoint_dict["epoch"] + 1, self.trainer_cfg.n_epochs),
                 total=self.trainer_cfg.n_epochs,
                 initial=self.checkpoint_dict["epoch"] + 1,
+                disable=self.trainer_cfg.disable_tqdm
             )
 
         sequencerizer = lambda x: torch.unfold_copy(
@@ -297,22 +318,18 @@ class TempoGPT:
             self.config.seq_len + self.config.pred_len, 
             self.trainer_cfg.batch_stride
             )
-        
         # Go through the data epoch_n times
         for epoch_n in pbar:
-            print(f"Epoch {epoch_n}")
             epoch_loss = []
             for dataset_path in self.trainer_cfg.dataset_path_lst:
-                print(f"Dataset: {dataset_path}")
                 df = pd.read_csv(dataset_path, index_col=0)
                 train_idx = int(self.trainer_cfg.train_set_size*len(df))
-                data_train = torch.tensor(df.values[:train_idx], dtype=torch.float32) # [train_len, num_features]
-                data_val = torch.tensor(df.values[train_idx:], dtype=torch.float32) # [val_len, num_features]
-                self._stl_resolve(mode="train", data_train = data_train.detach().numpy(), data_val = data_val.detach().numpy(), dataset_path=dataset_path)      
+                data_train = torch.tensor(df.values[:train_idx], dtype=torch.float32, device=self.device) # [train_len, num_features]
+                data_val = torch.tensor(df.values[train_idx:], dtype=torch.float32, device=self.device) # [val_len, num_features]
+                self._stl_resolve(mode="train", data_train = data_train.cpu().detach().numpy(), data_val = data_val.cpu().detach().numpy(), dataset_path=dataset_path)      
                 
                 # doing each feature of the dataset at a time
                 for feat_idx in range(data_train.shape[1]):
-                    print(f"Feature: {feat_idx}")
                     full_seq_train = data_train[epoch_n:, feat_idx]
                     seq_result = map(sequencerizer,
                         (
@@ -323,7 +340,7 @@ class TempoGPT:
                             )
                         )
                     sequences, trend_seqs_raw, seasonal_seqs_raw, residual_seqs_raw = list(seq_result) # all are [num_sequences, seq_len+pred_len]
-                    perm = torch.randperm(sequences.shape[0])
+                    perm = torch.randperm(sequences.shape[0], device=self.device)
 
                     seqs_x = sequences[perm, :self.config.seq_len] # [num_sequences, seq_len]
                     seqs_y = sequences[perm, self.config.seq_len:] # [num_sequences, pred_len]
@@ -352,28 +369,38 @@ class TempoGPT:
                         epoch_loss.append(loss.item())
                         optimizer.zero_grad()
 
-            if (epoch_n+1) % checkpointing_steps == 0:
-                self.save_checkpoint({
-                    "epoch": epoch_n,
-                    "model_state_dict": self.model.state_dict(),
-                    "optim_state_dict": optimizer.state_dict(),
-                })
+            if not hp_search:
+                if (epoch_n+1) % checkpointing_steps == 0:
+                    self.save_checkpoint({
+                        "epoch": epoch_n,
+                        "model_state_dict": self.model.state_dict(),
+                        "optim_state_dict": optimizer.state_dict(),
+                    })
 
             if self.trainer_cfg.lr_scheduler:
                 scheduler.step()
             
             pbar.set_description(f"Epoch Loss: {sum(epoch_loss)/len(epoch_loss)}")
             
+            if hp_search:
+                wandb.log({"train_loss": sum(epoch_loss)/len(epoch_loss), "epoch": epoch_n})
+
             if (epoch_n+1) % logging_steps == 0:
                 val_loss = self.evaluate(criterion, sequencerizer)
-                writer.add_scalars(
-                    "Loss", 
-                    {"Training" : sum(epoch_loss)/len(epoch_loss), "Validation": sum(val_loss)/len(val_loss)}, 
-                    epoch_n
-                    )
+                if hp_search:
+                    wandb.log({"val_loss": sum(val_loss)/len(val_loss), "epoch": epoch_n})
+                else:
+                    writer.add_scalars(
+                        "Loss", 
+                        {"Training" : sum(epoch_loss)/len(epoch_loss), "Validation": sum(val_loss)/len(val_loss)}, 
+                        epoch_n
+                        )
 
-        writer.flush()
-        writer.close()
+        if hp_search:
+            wandb.finish()
+        else:
+            writer.flush()
+            writer.close()
     
 
     def evaluate(self, criterion: callable, sequencerizer: callable) -> list:
@@ -391,8 +418,8 @@ class TempoGPT:
         for dataset_path in self.trainer_cfg.dataset_path_lst:
             df = pd.read_csv(dataset_path, index_col=0)
             train_idx = int(self.trainer_cfg.train_set_size*len(df))
-            data_val = torch.tensor(df.values[train_idx:], dtype=torch.float32) # [val_len, num_features]
-            self._stl_resolve(mode="val", data_val = data_val.detach().numpy(), dataset_path=dataset_path)      
+            data_val = torch.tensor(df.values[train_idx:], dtype=torch.float32, device=self.device) # [val_len, num_features]
+            self._stl_resolve(mode="val", data_val = data_val.cpu().detach().numpy(), dataset_path=dataset_path)      
             
             # doing each feature of the dataset at a time
             for feat_idx in range(data_val.shape[1]):

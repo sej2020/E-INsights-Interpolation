@@ -2,12 +2,13 @@ import pathlib
 import pandas as pd
 import numpy as np
 
-def searching_all_files(directory: str) -> list:
+def searching_all_files(directory: str, only_top_lvl=False) -> list:
     """
     Searches all files in a directory and returns a list of all files in the directory
 
     Args:
         directory: path to directory
+        only_top_lvl: whether to only return files in top level of the provided directory
 
     Returns:
         list of all files in the directory
@@ -18,7 +19,7 @@ def searching_all_files(directory: str) -> list:
     for x in dirpath.iterdir():
         if x.is_file():
             file_list.append(x)
-        elif x.is_dir():
+        elif x.is_dir() and not only_top_lvl:
             file_list.extend(searching_all_files(x))
     return file_list
 

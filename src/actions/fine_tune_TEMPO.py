@@ -3,7 +3,7 @@ For fine tuning the TEMPO model on E-INsights data.
 
 Typical usage example:
 ```bash
->>> python -m src.actions.fine_tune_TEMPO
+>>> python -m src.actions.fine_tune_TEMPO --device cuda --batch_size 2048 --batch_stride 64 --disable_tqdm --logging_frequency 0.2 --saving_frequency 0.2
 ```
 And to view the training progress, run the following command in the terminal:
 ```bash
@@ -33,8 +33,8 @@ parser.add_argument("--lr", type=float, default=0.0001)
 parser.add_argument("--logging_frequency", type=float, default=0.1)
 parser.add_argument("--saving_frequency", type=float, default=0.1)
 parser.add_argument("--lr_scheduler", action=argparse.BooleanOptionalAction, default=True)
-parser.add_argument("--resume_from_checkpoint", action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument("--disable_tqdm", action=argparse.BooleanOptionalAction, default=False)
+parser.add_argument("--resume_from_checkpoint", action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument("--checkpoint_path", type=str, default=None)
 parser.add_argument("--run_name", type=str, default=None)
 parser.add_argument("--device", type=str, choices=["cpu", "cuda"], default="cpu")
@@ -64,7 +64,7 @@ if args.dataset_path_lst is None:
 else:
     DATASETS = args.dataset_path_lst
 
-model = TempoGPT()
+model = TempoGPT(device=args.device)
 
 tempo_trainer_config = TrainerConfig(
     dataset_path_lst = DATASETS,
@@ -77,6 +77,7 @@ tempo_trainer_config = TrainerConfig(
     logging_frequency = args.logging_frequency,
     saving_frequency = args.saving_frequency,
     lr_scheduler = args.lr_scheduler,
+    disable_tqdm = args.disable_tqdm,
     resume_from_checkpoint = args.resume_from_checkpoint,
     checkpoint_path = args.checkpoint_path,
     run_name = NAME,

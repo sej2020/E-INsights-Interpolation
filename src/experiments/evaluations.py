@@ -30,8 +30,8 @@ from src.utils import searching_all_files
 from src.models.baseline import LinearInterpolation
 from src.models.statsforecast import StatsModels
 from src.models.LSTMs import LSTM, BidirectionalLSTM
-from src.models.TimeGPT import TimeGPT
-from src.models.TimesFM import TimesFM
+# from src.models.TimeGPT import TimeGPT
+# from src.models.TimesFM import TimesFM
 from src.models.TempoGPT import TempoGPT
 
 
@@ -72,7 +72,7 @@ class DirectEvaluation:
         """
         self.model = model
         
-        if not version_path and type(model) not in  [LinearInterpolation, StatsModels, TimeGPT, TimesFM, TempoGPT]:
+        if not version_path and type(model) not in  [LinearInterpolation, StatsModels, TempoGPT]:
             raise Exception("version_path cannot be None unless model is LinearInterpolation, StatsModels or TimeGPT.")
         
         if version_path and type(model) == LSTM:
@@ -180,7 +180,7 @@ class DirectEvaluation:
         """
         assert units in ["s", "min", "h", "D", "W", "MS", "YS"], "Invalid unit of time. Options: s, min, h, D, W, MS, YS"
 
-        file_paths = searching_all_files(dataset_directory)
+        file_paths = searching_all_files(dataset_directory, True)
 
         for _, file_path in enumerate(file_paths):
             final_dict = {}
@@ -196,7 +196,7 @@ class DirectEvaluation:
                 y = dataset.values[:,-1]
                 y = y.reshape(-1,1)
                 y_av = np.mean(y)
-            elif type(self.model) in [TimeGPT, TimesFM, TempoGPT]:
+            elif type(self.model) in [TempoGPT]:
                 x = dataset.values[:,:-1]
                 y = dataset.values[:,-1]
                 y = y.reshape(-1,1)
@@ -221,14 +221,14 @@ class DirectEvaluation:
             criterion = lambda x,y: np.sqrt(np.mean(((x - y)/y_av)) ** 2)
 
             for ab_length in ablation_lens:
-                if isinstance(self.model, TimesFM):
-                    self.model = TimesFM(ablation_len=ab_length)
+                #if isinstance(self.model, TimesFM):
+                #    self.model = TimesFM(ablation_len=ab_length)
                 print(ab_length, flush=True)
                 for _ in range(repetitions):
                     data = self._prepare_data(x, y, ab_length, ablation_start)
                     self.model.fit(data["x_ablated"], data["y_ablated"])
                     y_ablation_pred = self.model.predict(data["x_ablation"], data["new_ablation_start"], units=units).reshape(-1,1)
-                    if type(self.model) in [LinearInterpolation, StatsModels, TimeGPT, TimesFM, TempoGPT]:
+                    if type(self.model) in [LinearInterpolation, StatsModels, TempoGPT]:
                         RMSE_list.append(criterion(y_ablation_pred, data["y_ablation"]).item())
                     else:
                         y_ablation_pred = y_ablation_pred.detach().numpy()
