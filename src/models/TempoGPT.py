@@ -36,14 +36,15 @@ class TempoGPT:
         val_residual_stamp: residual stamp for validation
         device: device to run the model on.
     """
-    def __init__(self, device: str = "cpu"):
+    def __init__(self, device: str = "cpu", config = None):
         """
         Initializes an instance of the TempoGPT class.
 
         Args:
             device: device to run the model on. Default is "cpu".
+            config: configuration for TEMPO checkpoint model. Default is None, which uses the default configuration.
         """
-        self.config = TempoConfig()
+        self.config = TempoConfig() if config == None else config
         # self.model = ToyModel()
         self.model = TEMPO.TEMPO(
            self.config,

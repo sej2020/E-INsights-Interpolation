@@ -14,6 +14,7 @@ from src.models.statsforecast import StatsModels
 from src.models.TimeGPT import TimeGPT
 from src.models.TimesFM import TimesFM
 from src.models.TempoGPT import TempoGPT
+from src.models.TempoGPT import TempoConfig
 import argparse
 
 parser = argparse.ArgumentParser("evaluation")
@@ -33,6 +34,8 @@ parser.add_argument("--repetitions", type=int, default=100)
 parser.add_argument("--plot", action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument("--units", type=str, default="s")
 parser.add_argument("--results_name", type=str, required=True)
+
+parser.add_argument("--best_tempo_model_path", type=str, default=None)
 
 args = parser.parse_args()
 
@@ -66,7 +69,11 @@ elif args.model == "timesfm":
     model = TimesFM()
     eval = DirectEvaluation(model)
 elif args.model == "tempo":
-    model = TempoGPT()
+    if args.best_tempo_model_path is not None:
+        cfg = TempoConfig(best_model_path=args.best_tempo_model_path)
+        model = TempoGPT(config=cfg)
+    else:
+        model = TempoGPT()
     eval = DirectEvaluation(model)
 
 eval.evaluate(**eval_param_dict)
