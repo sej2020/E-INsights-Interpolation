@@ -3,5 +3,5 @@
 **/data
 **/TEMPO_checkpoints
 *.env
+**/checkpoints
 **/wandb
-**/gpu_logs
