@@ -224,7 +224,7 @@ class DirectEvaluation:
                 #if isinstance(self.model, TimesFM):
                 #    self.model = TimesFM(ablation_len=ab_length)
                 print(ab_length, flush=True)
-                for _ in range(repetitions):
+                for rep_n in range(repetitions):
                     data = self._prepare_data(x, y, ab_length, ablation_start)
                     self.model.fit(data["x_ablated"], data["y_ablated"])
                     y_ablation_pred = self.model.predict(data["x_ablation"], data["new_ablation_start"], units=units).reshape(-1,1)
@@ -239,7 +239,7 @@ class DirectEvaluation:
                                 ).item()
                             )
                         
-                    if plot:
+                    if plot and rep_n ==5:
                         self._plot(data, data["new_ablation_start"], y_ablation_pred)
                     
                     outcome_ablation_lens.append(data["new_ablation_len"])
@@ -265,7 +265,7 @@ class DirectEvaluation:
         Notes:
             Needs to be improved so that labeling of the plot is automated.
         """
-        if type(self.model) in [LinearInterpolation, StatsModels, TimeGPT, TimesFM]:
+        if type(self.model) in [LinearInterpolation, StatsModels, TempoGPT]:
             x_fin = data["x"]
             y_fin = data["y"]
             y_ablation_pred_fin = y_ablation_pred
@@ -297,5 +297,5 @@ class DirectEvaluation:
 
         plt.title("Example Prediction")
         plt.legend()
-        plt.show()
+        plt.savefig(f"plots/ex_{np.random.randint(1000, size=1).item()}.png")
 
