@@ -290,7 +290,7 @@ class DirectEvaluation:
             np.array([y_ablated_fin[ablation_start]])
         ))
         
-        plt.plot(predicted_interval_x, predicted_interval_y, label="LSTM", linestyle="dashed", color="blue")
+        plt.plot(predicted_interval_x, predicted_interval_y, label="TempoReg", linestyle="dashed", color="green")
         
         # plotting a straight line from the beginning of the ablated interval to the end
         plt.plot([ablation_start-1, ablation_start + data["new_ablation_len"]], [y_ablated_fin[ablation_start-1], y_ablated_fin[ablation_start]], label="Baseline", linestyle="dotted", color="red")
@@ -298,4 +298,5 @@ class DirectEvaluation:
         plt.title("Example Prediction")
         plt.legend()
         plt.savefig(f"plots/ex_{np.random.randint(1000, size=1).item()}.png")
+        plt.clf()
 
