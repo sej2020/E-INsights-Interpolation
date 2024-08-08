@@ -11,8 +11,8 @@ from src.models.LSTMs import LSTM, BidirectionalLSTM
 from src.models.baseline import LinearInterpolation
 from src.experiments.evaluations import DirectEvaluation
 from src.models.statsforecast import StatsModels
-# from src.models.TimeGPT import TimeGPT
-# from src.models.TimesFM import TimesFM
+from src.models.TimeGPT import TimeGPT
+from src.models.TimesFM import TimesFM
 from src.models.TempoGPT import TempoGPT
 from src.models.TempoGPT import TempoConfig
 import argparse
