@@ -122,7 +122,7 @@ def bar_chart_comp(
     with open(f"plots/{out_folder}/bar_dict.yaml", 'w') as file:
         yaml.dump(bar_dict, file)
     #grouped bar chart
-    barWidth = 0.1
+    barWidth = 0.07
     r1 = np.arange(len(int_len_list))
     for bars, color, mod_name in zip(bar_dict.values(), model_colors_list, model_name_list):
         plt.bar(r1, bars, color=color, width=barWidth, edgecolor='white', label=mod_name)
@@ -147,10 +147,11 @@ if __name__ == "__main__":
             f"{prefix}/{data}/{data}_lstm_rev.yaml",
             f"{prefix}/{data}/{data}_gpt.yaml",
             f"{prefix}/{data}/{data}_timesfm.yaml",
-            f"{prefix}/{data}/{data}_tempo.yaml"
+            f"{prefix}/{data}/{data}_tempo.yaml",
+            f"{prefix}/{data}/{data}_tempo_ft.yaml"
             ]
-        names = ["Baseline", "LSTM", "LSTM (rev)", "TimeGPT", "TimesFM", "TEMPO"]
-        colors = ["red", "blue", "green", "gold", "purple", "gray"]
+        names = ["Baseline", "LSTM", "LSTM (rev)", "TimeGPT", "TimesFM", "TEMPO", "TEMPO_FT"]
+        colors = ["red", "blue", "green", "gold", "purple", "gray", "orange"]
         len_list = [15, 30, 90]
         rep = 100
         out_folder = f"big_comp/{data}"
@@ -179,10 +180,11 @@ if __name__ == "__main__":
         f"{prefix}/{data}/{data}_lstm.yaml",
         f"{prefix}/{data}/{data}_gpt.yaml",
         f"{prefix}/{data}/{data}_timesfm.yaml",
-        f"{prefix}/{data}/{data}_tempo.yaml"
+        f"{prefix}/{data}/{data}_tempo.yaml",
+        f"{prefix}/{data}/{data}_tempo_ft.yaml"
         ]
-    names = ["Baseline", "LSTM", "TimeGPT", "TimesFM", "TEMPO"]
-    colors = ["red", "blue", "gold", "purple", "gray"]
+    names = ["Baseline", "LSTM", "TimeGPT", "TimesFM", "TEMPO", "TEMPO_FT"]
+    colors = ["red", "blue", "gold", "purple", "gray", "orange"]
     len_list = [15, 30, 90]
     rep = 100
     out_folder = f"big_comp/{data}"
