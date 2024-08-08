@@ -1,9 +1,8 @@
-**/logs
 **/archive
 **/data
 **/TEMPO_checkpoints
 *.env
-**/checkpoints
+**/*.pt
 **/wandb
 **/gpu_logs
 **/output
