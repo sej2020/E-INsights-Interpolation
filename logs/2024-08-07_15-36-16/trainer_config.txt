@@ -1,0 +1,8 @@
+TrainerConfig( dataset_path_lst: ['data/high_var_oct16/train/high_var_train.csv', 'data/min_av/amatrol-Mar24/train_CNC/training_CNC_VF5v2.csv', 'data/min_av/amatrol-Mar24/train_HVAC/training_HVAC_RTUv2.csv', 'data/min_av/OptoMMP-Oct23/train_M00/training_M00_PhA.csv', 'data/min_av/OptoMMP-Oct23/train_M02/training_M02_PhC.csv'], 
+            train_set_size: 0.75, n_epochs: 300, 
+            batch_size: 32, lr: 0.01, start_idx: None, 
+            stop_idx: None, optimizer: <class 'torch.optim.adamw.AdamW'>, logging_dir: logs, 
+            logging_frequency: 0.1, saving_frequency: 0.1, lr_scheduler: True, 
+            resume_from_checkpoint: False, checkpoint_path: None, run_name: 2024-08-07_15-36-16, 
+            reverse: False, batch_stride: 227)
+        
